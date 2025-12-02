@@ -5,6 +5,8 @@ import traceback
 import graphics
 import openxr_core
 import input_manager
+import rclpy
+import ros_interface
 
 class QuestStreamer:
     def __init__(self):
@@ -17,6 +19,10 @@ class QuestStreamer:
         self.input_mgr = None
         self.session_running = False
         self.session_focused = False
+        
+        # ROS Node
+        rclpy.init()
+        self.ros_node = ros_interface.QuestROSNode()
 
     def init_openxr_session(self):
         # Graphics Requirements
@@ -97,6 +103,15 @@ class QuestStreamer:
                     print(f"Sync Actions Failed: {e}")
                 
                 display_time = frame_state.predicted_display_time
+                
+                # Get Data
+                left_aim_data = self.input_mgr.get_pose_data(self.input_mgr.left_aim_space, display_time)
+                right_aim_data = self.input_mgr.get_pose_data(self.input_mgr.right_aim_space, display_time)
+                
+                # Publish to ROS
+                self.ros_node.publish_data(left_aim_data, right_aim_data, {}, {})
+                rclpy.spin_once(self.ros_node, timeout_sec=0)
+
                 self.input_mgr.print_pose("Left Aim ", self.input_mgr.left_aim_space, display_time)
                 self.input_mgr.print_pose("Right Aim", self.input_mgr.right_aim_space, display_time)
                 self.input_mgr.print_pose("Left Grip", self.input_mgr.left_grip_space, display_time)
@@ -120,6 +135,9 @@ class QuestStreamer:
             xr.destroy_instance(self.instance)
         if self.window:
             graphics.glfw.terminate()
+        if rclpy.ok():
+            self.ros_node.destroy_node()
+            rclpy.shutdown()
 
 if __name__ == "__main__":
     streamer = QuestStreamer()

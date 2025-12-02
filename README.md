@@ -7,7 +7,8 @@ A modular Python application to stream real-time controller data (pose, velocity
 *   **Real-time Tracking**: Captures Head, Left/Right Controller Aim, and Grip poses.
 *   **Velocity Data**: Streams Linear and Angular velocity for controllers.
 *   **Input Capture**: Reads Trigger, Squeeze, and Button states (A/B/X/Y, Menu, Thumbstick).
-*   **Modular Design**: Cleanly separated into graphics, core OpenXR, and input management modules.
+*   **ROS 2 Integration**: Publishes PoseStamped and Joy messages to ROS 2 topics.
+*   **Modular Design**: Cleanly separated into graphics, core OpenXR, input management, and ROS interface modules.
 *   **OpenGL Backend**: Uses a hidden GLFW window to satisfy OpenXR session requirements on Linux.
 
 ## Prerequisites
@@ -18,8 +19,10 @@ A modular Python application to stream real-time controller data (pose, velocity
 *   5GHz Wi-Fi router (for wireless streaming via WiVRn).
 
 ### Software
-*   **WiVRn**: An open-source OpenXR streaming runtime. Ensure the server is running on your PC and the client is installed on your headset.
-*   **Python 3.8+**
+*   **ROS 2 Humble**: Installed on the system.
+*   **WiVRn**: An open-source OpenXR streaming runtime.
+*   **Python 3.10**: Required for ROS 2 Humble compatibility.
+*   **uv**: Fast Python package installer.
 
 ## Installation
 
@@ -29,15 +32,16 @@ A modular Python application to stream real-time controller data (pose, velocity
     cd quest3-openxr-streamer
     ```
 
-2.  **Create a Virtual Environment**
+2.  **Create a Virtual Environment (with uv)**
+    We use `uv` to create a Python 3.10 environment that can access system ROS packages.
     ```bash
-    python3 -m venv .venv
+    uv venv .venv --python /usr/bin/python3 --system-site-packages
     source .venv/bin/activate
     ```
 
 3.  **Install Dependencies**
     ```bash
-    pip install pyopenxr glfw PyOpenGL
+    uv pip install -r requirements.txt
     ```
 
 4.  **System Dependencies**
@@ -51,21 +55,29 @@ A modular Python application to stream real-time controller data (pose, velocity
 1.  **Start WiVRn Server**
     Ensure your headset is connected to WiVRn.
 
-2.  **Run the Streamer**
-    Execute the main script. You may need to force the X11 backend for GLFW if you are on Wayland (common with WiVRn).
+2.  **Source ROS 2**
+    ```bash
+    source /opt/ros/humble/setup.bash
+    ```
+
+3.  **Run the Streamer**
+    Execute the main script.
 
     ```bash
-    # For X11 / Standard Setup
-    python quest_stream_opengl.py
+    # Activate venv
+    source .venv/bin/activate
 
-    # If you encounter windowing issues or are on Wayland:
+    # Run
     WAYLAND_DISPLAY= XDG_SESSION_TYPE=x11 python quest_stream_opengl.py
     ```
 
-3.  **Interact**
-    *   Put on the headset.
-    *   The script will wait for the session to become focused.
-    *   Once focused, you will see real-time data streaming in your terminal.
+4.  **Verify ROS Topics**
+    In another terminal:
+    ```bash
+    source /opt/ros/humble/setup.bash
+    ros2 topic list
+    ros2 topic echo /quest/right_hand/pose
+    ```
 
 ## Troubleshooting
 

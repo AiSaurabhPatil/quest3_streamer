@@ -129,6 +129,24 @@ class InputManager:
                 lin_vel = velocity.linear_velocity
                 print(f"    Lin Vel: ({lin_vel.x:.3f}, {lin_vel.y:.3f}, {lin_vel.z:.3f})")
             
-            if velocity.velocity_flags & xr.SPACE_VELOCITY_ANGULAR_VALID_BIT:
-                ang_vel = velocity.angular_velocity
-                print(f"    Ang Vel: ({ang_vel.x:.3f}, {ang_vel.y:.3f}, {ang_vel.z:.3f})")
+    def get_pose_data(self, space, display_time):
+        velocity = xr.SpaceVelocity(type=xr.StructureType.SPACE_VELOCITY)
+        location = xr.SpaceLocation(
+            type=xr.StructureType.SPACE_LOCATION,
+            next=ctypes.cast(ctypes.byref(velocity), ctypes.c_void_p)
+        )
+        
+        result = self.xrLocateSpace(space, self.ref_space, display_time, ctypes.byref(location))
+        
+        if result != xr.Result.SUCCESS:
+            return None
+
+        data = {}
+        if location.location_flags & xr.SPACE_LOCATION_POSITION_VALID_BIT:
+            data['position'] = location.pose.position
+            data['orientation'] = location.pose.orientation
+        
+        # We could also return velocity if needed, but let's stick to pose for now or add it to the dict
+        # The ROS interface expects 'position' and 'orientation' keys with objects having x,y,z attributes
+        
+        return data if data else None
