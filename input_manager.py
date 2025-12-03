@@ -89,7 +89,7 @@ class InputManager:
         self.ref_space = xr.create_reference_space(
             self.session,
             xr.ReferenceSpaceCreateInfo(
-                reference_space_type=xr.ReferenceSpaceType.STAGE,
+                reference_space_type=xr.ReferenceSpaceType.VIEW,
                 pose_in_reference_space=xr.Posef(),
             )
         )
