@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quest Controller Streamer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+
+        h1 {
+            color: #00d4ff;
+            margin-bottom: 20px;
+            text-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
+        }
+
+        .status {
+            padding: 10px 20px;
+            border-radius: 20px;
+            margin: 10px;
+            font-weight: bold;
+        }
+
+        .connected {
+            background: #00c853;
+        }
+
+        .disconnected {
+            background: #ff1744;
+        }
+
+        .waiting {
+            background: #ff9100;
+        }
+
+        #startBtn {
+            padding: 20px 40px;
+            font-size: 1.5em;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 10px;
+            color: white;
+            cursor: pointer;
+            margin: 20px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        #startBtn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+        }
+
+        #startBtn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .config {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px;
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .config label {
+            display: block;
+            margin: 10px 0 5px;
+        }
+
+        .config input {
+            width: 100%;
+            padding: 10px;
+            border-radius: 5px;
+            border: none;
+            font-size: 1em;
+        }
+
+        .data-display {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 10px;
+            font-family: monospace;
+            font-size: 0.9em;
+            white-space: pre-wrap;
+            width: 100%;
+            max-width: 600px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        #xrCanvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: -1;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Hidden canvas for WebXR rendering -->
+    <canvas id="xrCanvas"></canvas>
+
+    <h1>🎮 Quest Controller Streamer</h1>
+
+    <div class="config">
+        <label for="serverIP">PC Server IP:</label>
+        <input type="text" id="serverIP" value="localhost" placeholder="localhost or IP">
+        <label for="serverPort">Port:</label>
+        <input type="text" id="serverPort" value="9090" placeholder="9090">
+    </div>
+
+    <div id="wsStatus" class="status disconnected">WebSocket: Disconnected</div>
+    <div id="xrStatus" class="status waiting">XR: Not Started</div>
+
+    <button id="startBtn">🚀 Start AR Session</button>
+
+    <div class="data-display" id="dataDisplay">Controller data will appear here...</div>
+
+    <script>
+        let ws = null;
+        let xrSession = null;
+        let xrRefSpace = null;
+        let gl = null;
+        let xrGLLayer = null;
+
+        const wsStatusEl = document.getElementById('wsStatus');
+        const xrStatusEl = document.getElementById('xrStatus');
+        const startBtn = document.getElementById('startBtn');
+        const dataDisplay = document.getElementById('dataDisplay');
+        const canvas = document.getElementById('xrCanvas');
+
+        // Initialize WebGL
+        function initGL() {
+            gl = canvas.getContext('webgl2', { xrCompatible: true });
+            if (!gl) {
+                gl = canvas.getContext('webgl', { xrCompatible: true });
+            }
+            if (!gl) {
+                alert('WebGL not supported');
+                return false;
+            }
+            return true;
+        }
+
+        // Connect to WebSocket server on PC
+        function connectWebSocket() {
+            const ip = document.getElementById('serverIP').value;
+            const port = document.getElementById('serverPort').value;
+            const url = `ws://${ip}:${port}`;
+
+            try {
+                ws = new WebSocket(url);
+
+                ws.onopen = () => {
+                    wsStatusEl.textContent = 'WebSocket: Connected';
+                    wsStatusEl.className = 'status connected';
+                    console.log('WebSocket connected to', url);
+                };
+
+                ws.onclose = () => {
+                    wsStatusEl.textContent = 'WebSocket: Disconnected';
+                    wsStatusEl.className = 'status disconnected';
+                    // Try to reconnect after 2 seconds
+                    setTimeout(connectWebSocket, 2000);
+                };
+
+                ws.onerror = (e) => {
+                    console.error('WebSocket error:', e);
+                    wsStatusEl.textContent = 'WebSocket: Error';
+                    wsStatusEl.className = 'status disconnected';
+                };
+            } catch (e) {
+                console.error('Failed to connect:', e);
+            }
+        }
+
+        // Start WebXR session
+        async function startXR() {
+            if (!navigator.xr) {
+                alert('WebXR not supported on this browser');
+                return;
+            }
+
+            if (!initGL()) return;
+
+            try {
+                // Try AR first (passthrough), fallback to VR
+                let mode = 'immersive-ar';
+                const arSupported = await navigator.xr.isSessionSupported('immersive-ar');
+                if (!arSupported) {
+                    mode = 'immersive-vr';
+                }
+
+                xrSession = await navigator.xr.requestSession(mode, {
+                    requiredFeatures: ['local-floor'],
+                    optionalFeatures: ['hand-tracking']
+                });
+
+                xrStatusEl.textContent = `XR: ${mode.toUpperCase()} Active`;
+                xrStatusEl.className = 'status connected';
+                startBtn.disabled = true;
+
+                // Set up WebGL layer for XR
+                xrGLLayer = new XRWebGLLayer(xrSession, gl);
+                await xrSession.updateRenderState({
+                    baseLayer: xrGLLayer
+                });
+
+                xrRefSpace = await xrSession.requestReferenceSpace('local-floor');
+
+                xrSession.addEventListener('end', () => {
+                    xrStatusEl.textContent = 'XR: Session Ended';
+                    xrStatusEl.className = 'status disconnected';
+                    startBtn.disabled = false;
+                    xrSession = null;
+                });
+
+                // Start the render loop
+                xrSession.requestAnimationFrame(onXRFrame);
+
+            } catch (e) {
+                console.error('Failed to start XR session:', e);
+                alert('Failed to start XR: ' + e.message);
+            }
+        }
+
+        // XR frame loop - capture and send controller data
+        function onXRFrame(time, frame) {
+            if (!xrSession) return;
+
+            xrSession.requestAnimationFrame(onXRFrame);
+
+            // Clear the framebuffer (transparent for AR passthrough)
+            if (xrGLLayer) {
+                gl.bindFramebuffer(gl.FRAMEBUFFER, xrGLLayer.framebuffer);
+                gl.clearColor(0, 0, 0, 0);  // Transparent
+                gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+            }
+
+            const data = {
+                timestamp: time,
+                controllers: {}
+            };
+
+            // Process each input source (controller)
+            for (const inputSource of xrSession.inputSources) {
+                if (!inputSource.gamepad) continue;
+
+                const hand = inputSource.handedness; // 'left' or 'right'
+                const gamepad = inputSource.gamepad;
+
+                // Get pose from grip space
+                let pose = null;
+                if (inputSource.gripSpace) {
+                    pose = frame.getPose(inputSource.gripSpace, xrRefSpace);
+                }
+
+                const controllerData = {
+                    // Pose data
+                    position: pose ? {
+                        x: pose.transform.position.x,
+                        y: pose.transform.position.y,
+                        z: pose.transform.position.z
+                    } : null,
+                    orientation: pose ? {
+                        x: pose.transform.orientation.x,
+                        y: pose.transform.orientation.y,
+                        z: pose.transform.orientation.z,
+                        w: pose.transform.orientation.w
+                    } : null,
+
+                    // Button data (Quest Touch controllers layout)
+                    // buttons[0] = trigger, buttons[1] = squeeze/grip
+                    // buttons[3] = thumbstick click, buttons[4] = A/X, buttons[5] = B/Y
+                    trigger: gamepad.buttons[0]?.value || 0,
+                    squeeze: gamepad.buttons[1]?.value || 0,
+                    thumbstick_click: gamepad.buttons[3]?.pressed || false,
+                    button_a_x: gamepad.buttons[4]?.pressed || false,
+                    button_b_y: gamepad.buttons[5]?.pressed || false,
+
+                    // Axes data (thumbstick)
+                    // axes[2] = thumbstick X, axes[3] = thumbstick Y
+                    thumbstick_x: gamepad.axes[2] || 0,
+                    thumbstick_y: gamepad.axes[3] || 0
+                };
+
+                data.controllers[hand] = controllerData;
+            }
+
+            // Send data over WebSocket
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify(data));
+            }
+
+            // Update display (won't be visible in XR, but useful for debugging)
+            updateDisplay(data);
+        }
+
+        function updateDisplay(data) {
+            let text = `Timestamp: ${data.timestamp?.toFixed(0) || 'N/A'}\n\n`;
+
+            for (const [hand, ctrl] of Object.entries(data.controllers)) {
+                text += `=== ${hand.toUpperCase()} CONTROLLER ===\n`;
+                if (ctrl.position) {
+                    text += `Pos: (${ctrl.position.x.toFixed(3)}, ${ctrl.position.y.toFixed(3)}, ${ctrl.position.z.toFixed(3)})\n`;
+                }
+                if (ctrl.orientation) {
+                    text += `Rot: (${ctrl.orientation.x.toFixed(3)}, ${ctrl.orientation.y.toFixed(3)}, ${ctrl.orientation.z.toFixed(3)}, ${ctrl.orientation.w.toFixed(3)})\n`;
+                }
+                text += `Trigger: ${ctrl.trigger.toFixed(2)} | Grip: ${ctrl.squeeze.toFixed(2)}\n`;
+                text += `Stick: (${ctrl.thumbstick_x.toFixed(2)}, ${ctrl.thumbstick_y.toFixed(2)}) Click: ${ctrl.thumbstick_click ? '●' : '○'}\n`;
+                text += `A/X: ${ctrl.button_a_x ? '●' : '○'} | B/Y: ${ctrl.button_b_y ? '●' : '○'}\n\n`;
+            }
+
+            dataDisplay.textContent = text;
+        }
+
+        // Initialize
+        startBtn.addEventListener('click', () => {
+            connectWebSocket();
+            startXR();
+        });
+
+        // Check WebXR support
+        if (navigator.xr) {
+            navigator.xr.isSessionSupported('immersive-ar').then(arSupported => {
+                if (arSupported) {
+                    startBtn.textContent = '🚀 Start AR Session (Passthrough)';
+                } else {
+                    navigator.xr.isSessionSupported('immersive-vr').then(vrSupported => {
+                        if (vrSupported) {
+                            startBtn.textContent = '🚀 Start VR Session';
+                        } else {
+                            startBtn.textContent = '❌ XR Not Supported';
+                            startBtn.disabled = true;
+                        }
+                    });
+                }
+            });
+        } else {
+            startBtn.textContent = '❌ WebXR Not Available';
+            startBtn.disabled = true;
+        }
+    </script>
+</body>
+
+</html>

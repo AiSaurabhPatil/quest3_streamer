@@ -1,129 +1,161 @@
-# Quest 3 OpenXR Streamer
+# Quest 3 VR Teleoperation
 
-A modular Python application to stream real-time controller data (pose, velocity, and inputs) from a Meta Quest 3 headset to a Linux PC using OpenXR and WiVRn.
+Stream real-time controller data (pose, buttons, triggers) from Meta Quest 3 to ROS 2 for robot teleoperation using WebXR.
 
 ## Features
 
-*   **Real-time Tracking**: Captures Head, Left/Right Controller Aim, and Grip poses.
-*   **Velocity Data**: Streams Linear and Angular velocity for controllers.
-*   **Input Capture**: Reads Trigger, Squeeze, and Button states (A/B/X/Y, Menu, Thumbstick).
-*   **ROS 2 Integration**: Publishes PoseStamped and Joy messages to ROS 2 topics.
-*   **Modular Design**: Cleanly separated into graphics, core OpenXR, input management, and ROS interface modules.
-*   **OpenGL Backend**: Uses a hidden GLFW window to satisfy OpenXR session requirements on Linux.
+- **Full Controller Tracking**: 6DoF pose, trigger, grip, thumbstick, buttons (A/B/X/Y)
+- **WebXR + USB**: Low-latency streaming via USB with AR passthrough
+- **ROS 2 Integration**: Publishes `PoseStamped` and `Joy` messages
+- **Isaac Sim Ready**: Includes Franka Panda teleoperation with dynamic calibration
+- **MuJoCo Verification**: Test coordinate mapping before Isaac Sim
 
-## Prerequisites
+## Quick Start
 
-### Hardware
-*   Meta Quest 3 (or compatible OpenXR headset).
-*   Linux PC (tested on Ubuntu/Debian).
-*   5GHz Wi-Fi router (for wireless streaming via WiVRn).
+### Prerequisites
 
-### Software
-*   **ROS 2 Humble**: Installed on the system.
-*   **WiVRn**: An open-source OpenXR streaming runtime.
-*   **Python 3.10**: Required for ROS 2 Humble compatibility.
-*   **uv**: Fast Python package installer.
+- Meta Quest 3 with USB cable
+- Linux PC with ROS 2 Humble (tested on Ubuntu 22.04)
+- Python 3.10+, ADB installed
 
-## Installation
+### Installation
 
-1.  **Clone the Repository**
-    ```bash
-    git clone https://github.com/YOUR_USERNAME/quest3-openxr-streamer.git
-    cd quest3-openxr-streamer
-    ```
+```bash
+git clone https://github.com/AiSaurabhPatil/quest3-streamer.git
+cd quest3-streamer
 
-2.  **Create a Virtual Environment (with uv)**
-    We use `uv` to create a Python 3.10 environment that can access system ROS packages.
-    ```bash
-    uv venv .venv --python /usr/bin/python3 --system-site-packages
-    source .venv/bin/activate
-    ```
+# Create virtual environment with ROS access
+uv venv .venv --python /usr/bin/python3 --system-site-packages
+source .venv/bin/activate
 
-3.  **Install Dependencies**
-    ```bash
-    uv pip install -r requirements.txt
-    ```
+# Install dependencies
+uv pip install -r requirements.txt
 
-4.  **System Dependencies**
-    Ensure you have GLFW and GLX libraries installed:
-    ```bash
-    sudo apt-get install libglfw3 libgl1-mesa-glx
-    ```
+# System dependencies
+sudo apt-get install android-tools-adb
+```
 
-## Usage
+## Usage: WebXR Streaming
 
-1.  **Start WiVRn Server**
-    Ensure your headset is connected to WiVRn.
+WebXR runs natively on Quest and captures **all** controller inputs reliably.
 
-2.  **Source ROS 2**
-    ```bash
-    source /opt/ros/humble/setup.bash
-    ```
+### Low-Latency USB Connection
 
-3.  **Run the Streamer**
-    Execute the main script.
+Connect Quest via USB for minimal latency (~2-5ms):
 
-    ```bash
-    # Activate venv
-    source .venv/bin/activate
+```bash
+# Setup ADB reverse proxy (run once after connecting USB)
+adb reverse tcp:8080 tcp:8080  # HTTP server
+adb reverse tcp:9090 tcp:9090  # WebSocket
 
-    # RunWAYLAND_DISPLAY= XDG_SESSION_TYPE=x11 python quest_stream_opengl.py
-    
-    ```
+# Verify connection
+adb devices
+```
 
-4.  **Verify ROS Topics**
-    In another terminal:
-    ```bash
-    source /opt/ros/humble/setup.bash
-    ros2 topic list
-    ros2 topic echo /quest/right_hand/pose
-    ```
+### Start Streaming
 
-## Troubleshooting
+**Terminal 1** - HTTP Server:
+```bash
+cd /path/to/quest3-streamer
+python -m http.server 8080
+```
 
-*   **"Session not focused"**: Make sure you are wearing the headset and the WiVRn application is active.
-*   **"Could not load libGL.so.1"**: Install `libgl1-mesa-glx`.
-*   **"Failed to init GLFW"**: Ensure you are running in a graphical environment (not a pure TTY).
+**Terminal 2** - ROS Bridge:
+```bash
+source /opt/ros/humble/setup.bash
+source .venv/bin/activate
+python webxr_ros_bridge.py
+```
+
+**On Quest Browser**:
+1. Open: `http://localhost:8080/webxr_streamer.html`
+2. Set PC Server IP to: `localhost`
+3. Set Port to: `9090`
+4. Click **"Start AR Session"**
+
+You'll see AR passthrough with your controllers being tracked.
+
+**Terminal 3** - Verify:
+```bash
+ros2 topic echo /quest/right_hand/pose
+ros2 topic echo /quest/right_hand/inputs
+```
+
+## ROS Topics
+
+| Topic | Type | Description |
+|-------|------|-------------|
+| `/quest/left_hand/pose` | `PoseStamped` | Left controller 6DoF pose |
+| `/quest/right_hand/pose` | `PoseStamped` | Right controller 6DoF pose |
+| `/quest/left_hand/inputs` | `Joy` | Left controller buttons/axes |
+| `/quest/right_hand/inputs` | `Joy` | Right controller buttons/axes |
+
+### Joy Message Format
+
+```
+axes[0] = trigger (0.0-1.0)
+axes[1] = squeeze/grip (0.0-1.0)
+axes[2] = thumbstick X (-1.0 to 1.0)
+axes[3] = thumbstick Y (-1.0 to 1.0)
+buttons[0] = A/X button
+buttons[1] = B/Y button
+buttons[2] = Menu
+buttons[3] = Thumbstick click
+```
 
 ## Simulation & Verification
 
 ### 1. MuJoCo Verification
-We provide a lightweight MuJoCo simulation to verify the data pipeline and coordinate mapping before running heavy simulators.
 
-**Features:**
-*   Visualizes the Right Hand as a **Green Box** with axes.
-*   Includes a **Dummy Robot Arm** with IK to test reachability.
+Test the data pipeline before Isaac Sim:
 
-**Run:**
 ```bash
 source .venv/bin/activate
 python mujoco_sim.py
 ```
 
+Green target follows your right hand.
+
 ### 2. Isaac Sim Teleoperation
-Control a **Franka Panda** robot in NVIDIA Isaac Sim using the streamed data.
+
+Control a **Franka Panda** robot with your Quest controller.
 
 **Features:**
-*   Uses `omni.isaac.ros2_bridge` to subscribe to ROS topics.
-*   Uses `LulaKinematicsSolver` for smooth IK control.
-*   Maps Quest 3 coordinate space to Robot base frame.
-*   Gripper control via Controller Trigger.
+- Dynamic calibration (works sitting or standing)
+- Full 6DoF orientation tracking
+- Gripper control via trigger/grip button
+- Automatic workspace clamping
 
-**Run:**
-Use the provided wrapper script to handle environment variables and launch Isaac Sim:
+**Run** (do NOT source system ROS):
 ```bash
 ./run_isaac_teleop.sh
 ```
 
-### 3. VPN / Remote Setup
-If running the Streamer on a local laptop and Isaac Sim on a remote workstation (connected via VPN), standard ROS 2 discovery (Multicast) might fail.
+**Usage:**
+1. Hold hand steady for ~1 second (calibration)
+2. Move hand to control robot end-effector
+3. Press trigger or grip to close gripper
 
-**Solution:**
-1.  Edit `fastdds_vpn.xml` and add the VPN IP addresses of both machines.
-2.  Export the config on **BOTH** machines before running scripts:
-    ```bash
-    export FASTRTPS_DEFAULT_PROFILES_FILE=/path/to/fastdds_vpn.xml
-    ```
+
+## Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| `adb devices` shows nothing | Enable USB debugging on Quest, try different cable |
+| WebSocket disconnected | Check IP is `localhost` when using USB |
+| WebXR Not Available | Use `http://localhost:...` not IP address |
+| IK failures in Isaac Sim | Move hand to reachable position, check workspace limits |
+| Black screen in AR | Refresh page, restart AR session |
+
+## File Structure
+
+```
+├── webxr_streamer.html     # Quest browser app (WebXR)
+├── webxr_ros_bridge.py     # WebSocket → ROS bridge
+├── isaac_teleop.py         # Isaac Sim Franka control
+├── mujoco_sim.py           # MuJoCo verification
+└── run_isaac_teleop.sh     # Isaac Sim launcher
+```
 
 ## License
 

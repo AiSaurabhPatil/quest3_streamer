@@ -1,5 +1,4 @@
-glfw==2.10.0
 numpy==2.2.6
-PyOpenGL==3.1.10
-pyopenxr==1.1.5301
 scipy==1.15.3
+websockets>=12.0
+mkdocs-material
