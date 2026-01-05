@@ -1,0 +1,17 @@
+# Lula Robot Descriptor for OpenArm Right Arm
+# Used by Isaac Sim's LulaKinematicsSolver for IK
+api_version: 1.0
+
+cspace:
+  - openarm_right_joint1
+  - openarm_right_joint2
+  - openarm_right_joint3
+  - openarm_right_joint4
+  - openarm_right_joint5
+  - openarm_right_joint6
+  - openarm_right_joint7
+
+default_q: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+
+root_link: world
+end_effector: openarm_right_hand

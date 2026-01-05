@@ -1,119 +1,145 @@
 # Quest 3 VR Teleoperation
 
-Stream real-time controller data (pose, buttons, triggers) from Meta Quest 3 to ROS 2 for robot teleoperation using WebXR.
+Stream real-time controller data from Meta Quest 3 to ROS 2 for robot teleoperation using WebXR.
 
 ## Features
 
 - **Full Controller Tracking**: 6DoF pose, trigger, grip, thumbstick, buttons (A/B/X/Y)
-- **WebXR + USB**: Low-latency streaming via USB with AR passthrough
+- **Bimanual Teleoperation**: Control dual-arm robots with both Quest controllers
+- **WebXR Wireless Streaming**: Low-latency via HTTPS over WiFi
 - **ROS 2 Integration**: Publishes `PoseStamped` and `Joy` messages
-- **Isaac Sim Ready**: Includes Franka Panda teleoperation with dynamic calibration
-- **MuJoCo Verification**: Test coordinate mapping before Isaac Sim
-
+- **Isaac Sim Ready**: Supports OpenArm bimanual  and Franka Panda
+- **Multi-Camera Support**: Head and wrist cameras with switchable views
+- **Centralized Config**: All paths in `config/config.yaml`
 
 ## Video Preview
 
-![Quest 3 Streamer Demo](docs/assets/quest3-streamer-preview.gif)
+![Quest 3 Streamer Demo](docs/assets/quest3_streamer_preview.gif)
 
-> **Note**: This is a preview. For the full quality video, check `tutorial_video/quest3-streamer.mp4` in the repository.
+> **Note**: Full quality video in `tutorial_video/quest3_streamer.mp4`
+
+## Project Structure
+
+```
+quest3_streamer/
+├── config/
+│   └── config.yaml           # Centralized paths configuration
+├── src/
+│   ├── isaac_openarm_teleop.py   # Bimanual OpenArm teleoperation
+│   ├── isaac_panda_teleop.py     # Franka Panda teleoperation
+│   └── webxr_ros_bridge.py       # WebXR → ROS 2 bridge
+├── web/
+│   ├── webxr_streamer.html       # Quest browser WebXR app
+│   └── https_server.py           # HTTPS server for wireless
+├── scripts/
+│   ├── run_openarm_teleop.sh     # Launch OpenArm teleop
+│   ├── run_panda_teleop.sh       # Launch Panda teleop
+│   ├── run_wireless.sh           # Launch wireless streaming
+│   └── generate_cert.sh          # Generate SSL certificates
+├── openarm_config/           # OpenArm robot config (USD, URDF)
+├── certs/                    # SSL certificates (gitignored)
+└── docs/                     # Documentation
+```
 
 ## Quick Start
 
 ### Prerequisites
 
-- Meta Quest 3 with USB cable
-- Linux PC with ROS 2 Humble (tested on Ubuntu 22.04)
-- Python 3.10+, ADB installed
+- Meta Quest 3 on same WiFi network as PC
+- Linux PC with ROS 2 Humble (Ubuntu 22.04)
+- Python 3.10+
+- NVIDIA Isaac Sim (for robot simulation)
 
 ### Installation
 
 ```bash
-git clone https://github.com/AiSaurabhPatil/quest3-streamer.git
-cd quest3-streamer
+git clone https://github.com/AiSaurabhPatil/quest3_streamer.git
+cd quest3_streamer
 
-# Create virtual environment with ROS access
-uv venv .venv --python /usr/bin/python3 --system-site-packages
+# Create virtual environment
+python3 -m venv .venv --system-site-packages
 source .venv/bin/activate
 
 # Install dependencies
-uv pip install -r requirements.txt
-
-# System dependencies
-sudo apt-get install android-tools-adb
+pip install -r requirements.txt
 ```
 
-## Usage: WebXR Streaming
+## Usage
 
-WebXR runs natively on Quest and captures **all** controller inputs reliably.
+### Wireless Streaming
 
-### Low-Latency USB Connection
-
-Connect Quest via USB for minimal latency (~2-5ms):
+One-command setup:
 
 ```bash
-# Setup ADB reverse proxy (run once after connecting USB)
-adb reverse tcp:8080 tcp:8080  # HTTP server
-adb reverse tcp:9090 tcp:9090  # WebSocket
-
-# Verify connection
-adb devices
+./scripts/run_wireless.sh
 ```
 
-### Wireless Streaming (LAN)
+This starts both HTTPS server and ROS bridge. On Quest browser:
+1. Navigate to `https://<YOUR_PC_IP>:8000/web/webxr_streamer.html`
+2. Accept security warning (self-signed cert)
+3. Click **"Start AR Session"**
 
-For wireless connection, you must use **HTTPS** (required by WebXR) with self-signed certificates.
+### Isaac Sim Teleoperation
 
-1. **Generate Certificates**:
-   ```bash
-   bash generate_cert.sh
-   # Generates cert.pem and key.pem
-   ```
+#### OpenArm Bimanual Robot
 
-2. **Run HTTPS Server** (Terminal 1):
-   ```bash
-   python https_server.py
-   # Serves at https://0.0.0.0:8000
-   ```
-
-3. **Run Secure ROS Bridge** (Terminal 2):
-   ```bash
-   python webxr_ros_bridge.py --cert cert.pem --key key.pem
-   # Listens on wss://0.0.0.0:9090
-   ```
-
-4. **On Quest Browser**:
-   - Navigate to `https://<YOUR_PC_IP>:8000/webxr_streamer.html`
-   - **Accept Security Warning**: Click "Advanced" -> "Proceed to..." (since we use self-signed certs)
-   - Ensure "PC Server IP" matches your PC's IP.
-   - Click **"Start AR Session"**.
-
-### Start Streaming
-
-**Terminal 1** - HTTP Server:
 ```bash
-cd /path/to/quest3-streamer
-python -m http.server 8080
+./scripts/run_openarm_teleop.sh
 ```
 
-**Terminal 2** - ROS Bridge:
+**Features:**
+- Both controllers mapped to left/right arms
+- Dynamic calibration (works sitting or standing)
+- Full 6DoF orientation tracking  
+- Smooth gripper control (trigger/grip)
+- Camera switching with A/X buttons
+- Publishes `/joint_states` and camera images for LeRobot
+
+**Calibration:**
+1. Start the teleop script and wait for Isaac Sim to load
+2. Put on your Quest headset and start the AR session
+3. **Hold both controllers steady** in a comfortable position for ~1 second
+4. The script will print "CALIBRATION COMPLETE" for each arm
+5. Your current hand position becomes the robot's home position
+6. Move your hands to control the robot!
+
+> **Tip**: Stand or sit in a comfortable pose during calibration. The robot will mirror your hand movements relative to this starting position.
+
+**Controls:**
+| Controller | Action |
+|------------|--------|
+| Left Controller | Controls left arm |
+| Right Controller | Controls right arm |
+| Trigger/Grip | Close gripper |
+| A/X Button | Cycle camera views |
+
+#### Franka Panda Robot
+
 ```bash
-source /opt/ros/humble/setup.bash
-source .venv/bin/activate
-python webxr_ros_bridge.py
+./scripts/run_panda_teleop.sh
 ```
 
-**On Quest Browser**:
-1. Open: `http://localhost:8080/webxr_streamer.html`
-2. Set PC Server IP to: `localhost`
-3. Set Port to: `9090`
-4. Click **"Start AR Session"**
+Single-arm teleoperation with right controller.
 
-You'll see AR passthrough with your controllers being tracked.
+## Configuration
 
-**Terminal 3** - Verify:
-```bash
-ros2 topic echo /quest/right_hand/pose
-ros2 topic echo /quest/right_hand/inputs
+Edit `config/config.yaml` to customize paths:
+
+```yaml
+paths:
+  isaac_sim: "/path/to/isaac_sim"
+  openarm:
+    usd: "openarm_config/openarm_bimanual/openarm_bimanual.usd"
+    urdf: "openarm_config/openarm_bimanual_stl.urdf"
+  panda:
+    usd: "environment.usd"
+  certs:
+    cert: "certs/cert.pem"
+    key: "certs/key.pem"
+
+server:
+  websocket_port: 9090
+  https_port: 8000
 ```
 
 ## ROS Topics
@@ -124,73 +150,21 @@ ros2 topic echo /quest/right_hand/inputs
 | `/quest/right_hand/pose` | `PoseStamped` | Right controller 6DoF pose |
 | `/quest/left_hand/inputs` | `Joy` | Left controller buttons/axes |
 | `/quest/right_hand/inputs` | `Joy` | Right controller buttons/axes |
-
-### Joy Message Format
-
-```
-axes[0] = trigger (0.0-1.0)
-axes[1] = squeeze/grip (0.0-1.0)
-axes[2] = thumbstick X (-1.0 to 1.0)
-axes[3] = thumbstick Y (-1.0 to 1.0)
-buttons[0] = A/X button
-buttons[1] = B/Y button
-buttons[2] = Menu
-buttons[3] = Thumbstick click
-```
-
-## Simulation & Verification
-
-### 1. MuJoCo Verification
-
-Test the data pipeline before Isaac Sim:
-
-```bash
-source .venv/bin/activate
-python mujoco_sim.py
-```
-
-Green target follows your right hand.
-
-### 2. Isaac Sim Teleoperation
-
-Control a **Franka Panda** robot with your Quest controller.
-
-**Features:**
-- Dynamic calibration (works sitting or standing)
-- Full 6DoF orientation tracking
-- Gripper control via trigger/grip button
-- Automatic workspace clamping
-
-**Run** (do NOT source system ROS):
-```bash
-./run_isaac_teleop.sh
-```
-
-**Usage:**
-1. Hold hand steady for ~1 second (calibration)
-2. Move hand to control robot end-effector
-3. Press trigger or grip to close gripper
+| `/joint_states` | `JointState` | Robot joint positions (for recording) |
+| `/camera/head/image_raw` | `Image` | Head camera (OpenArm) |
+| `/camera/wrist_left/image_raw` | `Image` | Left wrist camera |
+| `/camera/wrist_right/image_raw` | `Image` | Right wrist camera |
 
 
 ## Troubleshooting
 
 | Issue | Solution |
 |-------|----------|
-| `adb devices` shows nothing | Enable USB debugging on Quest, try different cable |
-| WebSocket disconnected | Check IP is `localhost` when using USB |
-| WebXR Not Available | Use `http://localhost:...` not IP address |
-| IK failures in Isaac Sim | Move hand to reachable position, check workspace limits |
-| Black screen in AR | Refresh page, restart AR session |
-
-## File Structure
-
-```
-├── webxr_streamer.html     # Quest browser app (WebXR)
-├── webxr_ros_bridge.py     # WebSocket → ROS bridge
-├── isaac_teleop.py         # Isaac Sim Franka control
-├── mujoco_sim.py           # MuJoCo verification
-└── run_isaac_teleop.sh     # Isaac Sim launcher
-```
+| 404 error on webpage | Use `/web/webxr_streamer.html` path |
+| WebSocket disconnected | Check PC IP is correct |
+| WebXR Not Available | Must use HTTPS for wireless |
+| IK failures | Move hand to reachable position |
+| No controller data | Run `ros2 topic list \| grep quest` |
 
 ## License
 

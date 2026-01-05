@@ -1,39 +1,42 @@
 # Installation Guide
 
+Complete guide to set up the Quest 3 VR Teleoperation project.
+
 ## Prerequisites
 
-Before setting up the project, ensure you have the following hardware and software:
-
 ### Hardware
-- **Meta Quest 3** headset.
-- **USB-C Data Cable** (high quality recommended for low latency).
-- **Linux PC** (tested on Ubuntu 22.04).
+
+| Component | Description |
+|-----------|-------------|
+| **Meta Quest 3** | VR headset with controllers |
+| **Linux PC** | Ubuntu 22.04 recommended |
+| **WiFi Network** | Quest and PC on same network |
+| **NVIDIA GPU** | Required for Isaac Sim |
 
 ### Software
-- **ROS 2 Humble**: [Installation Guide](https://docs.ros.org/en/humble/Installation.html).
-- **Python 3.10+**.
-- **ADB (Android Debug Bridge)**: For USB communication with the headset.
-- **Google Chrome / Edge** (on PC for debugging) and **Meta Quest Browser** (on headset).
+
+| Software | Version | Purpose |
+|----------|---------|---------|
+| ROS 2 Humble | Latest | Robot communication |
+| Python | 3.10+ | Bridge and teleop scripts |
+| NVIDIA Isaac Sim | 5.0.0+ | Robot simulation |
+| Meta Quest Browser | Latest | WebXR client |
 
 ## Step-by-Step Installation
 
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/AiSaurabhPatil/quest3-streamer.git
-cd quest3-streamer
+git clone https://github.com/AiSaurabhPatil/quest3_streamer.git
+cd quest3_streamer
 ```
 
 ### 2. Set Up Virtual Environment
 
-It is recommended to use `uv` or `venv` to manage python dependencies and avoid conflicts with system packages.
+Create a Python virtual environment with ROS 2 access:
 
 ```bash
-# Using uv (recommended)
-uv venv .venv --python /usr/bin/python3 --system-site-packages
-source .venv/bin/activate
-
-# OR using standard venv
+# Create venv with system site packages (for ROS access)
 python3 -m venv .venv --system-site-packages
 source .venv/bin/activate
 ```
@@ -41,28 +44,100 @@ source .venv/bin/activate
 ### 3. Install Python Dependencies
 
 ```bash
-# Using uv
-uv pip install -r requirements.txt
-
-# OR using pip
 pip install -r requirements.txt
 ```
 
-### 4. Install System Dependencies
+**Dependencies installed:**
 
-ADB is required for USB communication.
+| Package | Purpose |
+|---------|---------|
+| `numpy` | Numerical computations |
+| `scipy` | Rotation transformations |
+| `websockets` | WebSocket server |
+| `pyyaml` | Config file parsing |
+
+### 4. Configure Isaac Sim Path
+
+Edit `config/config.yaml` to set your Isaac Sim installation path:
+
+```yaml
+paths:
+  isaac_sim: "/path/to/your/isaac_sim"  # Update this!
+```
+
+### 5. Generate SSL Certificates
+
+WebXR requires HTTPS for wireless connections. Generate self-signed certificates:
 
 ```bash
-sudo apt-get install android-tools-adb
+./scripts/generate_cert.sh
 ```
+
+This creates `certs/cert.pem` and `certs/key.pem`.
 
 ## Verify Installation
 
-To check if everything is installed correctly, you can run the MuJoCo simulation test:
+### Test 1: ROS Bridge
 
 ```bash
 source .venv/bin/activate
-python mujoco_sim.py
+python src/webxr_ros_bridge.py --help
 ```
 
-If a window opens showing a robot arm or a target following your mouse/input (if connected), the environment is set up correctly.
+Should show available command-line options.
+
+### Test 2: Wireless Streaming
+
+```bash
+./scripts/run_wireless.sh
+```
+
+Should print:
+- HTTPS server URL
+- WebSocket server URL
+- Your PC's IP address
+
+### Test 3: Isaac Sim (Optional)
+
+If you have Isaac Sim installed:
+
+```bash
+./scripts/run_openarm_teleop.sh
+```
+
+Isaac Sim should launch and load the OpenArm robot.
+
+## Configuration Reference
+
+The `config/config.yaml` file centralizes all paths:
+
+```yaml
+paths:
+  # Isaac Sim installation (absolute path)
+  isaac_sim: "/home/user/isaac_sim"
+  
+  # OpenArm robot configuration
+  openarm:
+    usd: "openarm_config/openarm_bimanual/openarm_bimanual.usd"
+    urdf: "openarm_config/openarm_bimanual_stl.urdf"
+    left_arm_config: "openarm_config/left_arm"
+    right_arm_config: "openarm_config/right_arm"
+  
+  # Panda robot configuration
+  panda:
+    usd: "environment.usd"
+  
+  # SSL certificates
+  certs:
+    cert: "certs/cert.pem"
+    key: "certs/key.pem"
+
+# Server configuration
+server:
+  websocket_port: 9090
+  https_port: 8000
+```
+
+## Next Steps
+
+Once installed, proceed to the [Usage Guide](usage.md) to start teleoperating robots.
