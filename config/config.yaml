@@ -1,0 +1,27 @@
+# Quest3 Streamer Configuration
+# All paths are relative to project root unless absolute
+
+paths:
+  # Isaac Sim installation (absolute path)
+  isaac_sim: "/home/saurabh/isaac_sim"
+  
+  # OpenArm robot configuration
+  openarm:
+    usd: "openarm_config/openarm_bimanual/openarm_bimanual.usd"
+    urdf: "openarm_config/openarm_bimanual_stl.urdf"
+    left_arm_config: "openarm_config/left_arm"
+    right_arm_config: "openarm_config/right_arm"
+  
+  # Panda robot configuration
+  panda:
+    usd: "environment.usd"
+  
+  # SSL certificates
+  certs:
+    cert: "certs/cert.pem"
+    key: "certs/key.pem"
+
+# Server configuration
+server:
+  websocket_port: 9090
+  https_port: 8000
