@@ -11,9 +11,76 @@ simulation_app = SimulationApp({"headless": True})
 from omni.isaac.core import World
 from omni.isaac.franka import Franka
 from omni.isaac.core.objects import DynamicSphere
-from omni.isaac.core.utils.stage import get_current_stage, save_stage
-from pxr import UsdGeom, Gf, UsdPhysics, PhysxSchema
+from omni.isaac.core.utils.stage import get_current_stage, save_stage, add_reference_to_stage
+from pxr import UsdGeom, Gf, UsdPhysics, PhysxSchema, Usd
 import numpy as np
+
+# Isaac Sim Assets URL
+ISAAC_ASSETS_URL = "https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/4.2/Isaac"
+
+
+def add_physics_object(stage, asset_url: str, prim_path: str, position: tuple,
+                       orientation_euler: tuple = (0, 0, 0), scale: float = 1.0,
+                       mass: float = 0.2, static_friction: float = 0.7,
+                       dynamic_friction: float = 0.5):
+    """
+    Load a USD asset and apply physics properties for pick-and-place.
+    
+    Args:
+        stage: USD stage
+        asset_url: URL or path to USD asset
+        prim_path: Prim path for the object
+        position: (x, y, z) position tuple
+        orientation_euler: (rx, ry, rz) rotation in degrees
+        scale: Uniform scale factor
+        mass: Mass in kg
+        static_friction: Static friction coefficient
+        dynamic_friction: Dynamic friction coefficient
+    """
+    # Add reference to the asset
+    add_reference_to_stage(usd_path=asset_url, prim_path=prim_path)
+    
+    prim = stage.GetPrimAtPath(prim_path)
+    if not prim.IsValid():
+        print(f"[Warning] Failed to load asset at {prim_path}")
+        return None
+    
+    # Apply transform
+    xformable = UsdGeom.Xformable(prim)
+    xformable.ClearXformOpOrder()
+    xformable.AddTranslateOp().Set(Gf.Vec3d(*position))
+    xformable.AddRotateXYZOp().Set(Gf.Vec3d(*orientation_euler))
+    xformable.AddScaleOp().Set(Gf.Vec3d(scale, scale, scale))
+    
+    # Apply RigidBody API for dynamics
+    UsdPhysics.RigidBodyAPI.Apply(prim)
+    
+    # Apply Mass
+    mass_api = UsdPhysics.MassAPI.Apply(prim)
+    mass_api.GetMassAttr().Set(mass)
+    
+    # Create Physics Material for friction
+    material_path = f"{prim_path}/PhysicsMaterial"
+    material_prim = stage.DefinePrim(material_path, "Material")
+    
+    # Apply USD Physics material and set friction
+    phys_material = UsdPhysics.MaterialAPI.Apply(material_prim)
+    phys_material.CreateStaticFrictionAttr().Set(static_friction)
+    phys_material.CreateDynamicFrictionAttr().Set(dynamic_friction)
+    phys_material.CreateRestitutionAttr().Set(0.1)  # Low bounce
+    
+    # Apply collision to all mesh children
+    def apply_collision_recursive(p):
+        if p.GetTypeName() == "Mesh":
+            UsdPhysics.CollisionAPI.Apply(p)
+            UsdPhysics.MeshCollisionAPI.Apply(p)
+        for child in p.GetChildren():
+            apply_collision_recursive(child)
+    
+    apply_collision_recursive(prim)
+    
+    print(f"[Setup] Added physics object: {prim_path} (mass={mass}kg, friction={static_friction}/{dynamic_friction})")
+    return prim
 
 def create_bowl(stage, prim_path: str, position: tuple, radius: float = 0.08, height: float = 0.05):
     """Create a physics-enabled bowl using USD primitives."""
@@ -89,6 +156,56 @@ def main():
     world.scene.add(ball)
     
     # -------------------------------------------------------------------------
+    # PHYSICS OBJECTS (Mugs, Container, Cube)
+    # -------------------------------------------------------------------------
+    print("[Setup] Adding physics objects...")
+    
+    # Mug A2 (green mug)
+    add_physics_object(
+        stage, 
+        f"{ISAAC_ASSETS_URL}/Props/Mugs/SM_Mug_A2.usd",
+        "/World/Mug_A2",
+        position=(0.4, 0.25, 0.02),
+        mass=0.15,
+        static_friction=0.8,
+        dynamic_friction=0.6
+    )
+    
+    # Mug C1 (yellow mug)
+    add_physics_object(
+        stage,
+        f"{ISAAC_ASSETS_URL}/Props/Mugs/SM_Mug_C1.usd",
+        "/World/Mug_C1",
+        position=(0.5, -0.25, 0.02),
+        mass=0.15,
+        static_friction=0.8,
+        dynamic_friction=0.6
+    )
+    
+    # Small KLT Container (blue bin)
+    add_physics_object(
+        stage,
+        f"{ISAAC_ASSETS_URL}/Props/KLT_Bin/small_KLT.usd",
+        "/World/small_KLT",
+        position=(0.7, 0.0, 0.02),
+        mass=0.3,
+        static_friction=0.6,
+        dynamic_friction=0.4
+    )
+    
+    # Nvidia Cube
+    add_physics_object(
+        stage,
+        f"{ISAAC_ASSETS_URL}/Props/Blocks/nvidia_cube.usd",
+        "/World/nvidia_cube",
+        position=(0.45, 0.0, 0.02),
+        scale=0.5,
+        mass=0.08,
+        static_friction=0.7,
+        dynamic_friction=0.5
+    )
+    
+    # -------------------------------------------------------------------------
     # CAMERA (Parented under Hand)
     # -------------------------------------------------------------------------
     # To avoid "Closed Articulation" errors, we parent the camera directly to the hand link.
@@ -121,7 +238,7 @@ def main():
     print(f"[Setup] Parented to {hand_prim_path}")
     
     # Save Stage
-    save_path = "/home/saurabh/Development/meta_openxr/environment.usd"
+    save_path = "/home/saurabh/Development/quest3_streamer/environment.usd"
     save_stage(save_path)
     print(f"SUCCESS: Stage saved to {save_path}")
     print("INSTRUCTIONS:")

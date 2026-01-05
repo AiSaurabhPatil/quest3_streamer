@@ -125,7 +125,7 @@
 
     <div class="config">
         <label for="serverIP">PC Server IP:</label>
-        <input type="text" id="serverIP" value="localhost" placeholder="localhost or IP">
+        <input type="text" id="serverIP" value="" placeholder="Enter PC IP Address">
         <label for="serverPort">Port:</label>
         <input type="text" id="serverPort" value="9090" placeholder="9090">
     </div>
@@ -165,9 +165,12 @@
 
         // Connect to WebSocket server on PC
         function connectWebSocket() {
-            const ip = document.getElementById('serverIP').value;
+            const ip = document.getElementById('serverIP').value || window.location.hostname;
             const port = document.getElementById('serverPort').value;
-            const url = `ws://${ip}:${port}`;
+            
+            // Auto-detect protocol based on page security
+            const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+            const url = `${protocol}://${ip}:${port}`;
 
             try {
                 ws = new WebSocket(url);
@@ -337,6 +340,9 @@
         }
 
         // Initialize
+        // Pre-fill IP if running on localhost/LAN
+        document.getElementById('serverIP').value = window.location.hostname;
+
         startBtn.addEventListener('click', () => {
             connectWebSocket();
             startXR();

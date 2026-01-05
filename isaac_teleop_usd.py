@@ -5,7 +5,13 @@
 from omni.isaac.kit import SimulationApp
 
 # Headless = False to see the simulation
-simulation_app = SimulationApp({"headless": False})
+simulation_app = SimulationApp({
+    "headless": False, 
+    "width": 1920, 
+    "height": 1080, 
+    "window_width": 1920, 
+    "window_height": 1080,
+})
 
 from omni.isaac.core.utils.extensions import enable_extension
 enable_extension("omni.isaac.ros2_bridge")
@@ -28,7 +34,7 @@ from omni.isaac.core.utils.stage import open_stage
 from pxr import UsdGeom, UsdPhysics, PhysxSchema, Gf
 
 # CONFIGURE PATH TO USD
-USD_PATH = "/home/saurabh/Development/meta_openxr/environment.usd"
+USD_PATH = "/home/saurabh/Development/quest3_streamer/environment.usd"
 
 # CONFIGURATION (Same as original)
 CONFIG = {
@@ -142,6 +148,25 @@ def main():
         urdf_path=mg_config["urdf_path"]
     )
     
+    # =========================================================================
+    # UI SETUP: Zoom Mode (Minimize Panels)
+    # =========================================================================
+    import omni.ui
+    # Attempt to hide standard panels to maximize viewport
+    windows_to_hide = [
+        "Stage", "Layer", "Render Settings", "Content", "Content Library", 
+        "Console", "Property", "Properties", "Semantics", "Visual Scripting"
+    ]
+    
+    print("[UI] Minimizing panels for Zoom Mode...")
+    for name in windows_to_hide:
+        try:
+            w = omni.ui.Workspace.get_window(name)
+            if w:
+                w.visible = False
+        except:
+            pass
+
     print("[Init] Resetting World...")
     world.reset()
     

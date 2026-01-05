@@ -23,6 +23,9 @@ except ImportError:
     print("Please install websockets: pip install websockets")
     exit(1)
 
+import ssl
+import os
+
 
 class WebXRROSBridge(Node):
     def __init__(self):
@@ -96,10 +99,11 @@ class WebXRROSBridge(Node):
 
 
 class WebSocketServer:
-    def __init__(self, ros_node, host='0.0.0.0', port=9090):
+    def __init__(self, ros_node, host='0.0.0.0', port=9091, ssl_context=None):
         self.ros_node = ros_node
         self.host = host
         self.port = port
+        self.ssl_context = ssl_context
         self.clients = set()
     
     async def handler(self, websocket, path=None):
@@ -123,7 +127,8 @@ class WebSocketServer:
     
     async def start(self):
         """Start the WebSocket server"""
-        self.ros_node.get_logger().info(f"Starting WebSocket server on ws://{self.host}:{self.port}")
+        protocol = "wss" if self.ssl_context else "ws"
+        self.ros_node.get_logger().info(f"Starting WebSocket server on {protocol}://{self.host}:{self.port}")
         
         # Get local IP for display
         import socket
@@ -136,7 +141,7 @@ class WebSocketServer:
         except:
             pass
         
-        async with websockets.serve(self.handler, self.host, self.port):
+        async with websockets.serve(self.handler, self.host, self.port, ssl=self.ssl_context):
             await asyncio.Future()  # Run forever
 
 
@@ -147,11 +152,22 @@ async def ros_spin(node):
         await asyncio.sleep(0.01)
 
 
-async def main(host, port):
+async def main(host, port, cert_file=None, key_file=None):
     """Main async entry point"""
     rclpy.init()
     ros_node = WebXRROSBridge()
-    ws_server = WebSocketServer(ros_node, host, port)
+    
+    ssl_context = None
+    if cert_file and key_file:
+        if os.path.exists(cert_file) and os.path.exists(key_file):
+            ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+            ssl_context.load_cert_chain(cert_file, key_file)
+            ros_node.get_logger().info("🔐 SSL Enabled for WebSocket")
+        else:
+            ros_node.get_logger().error(f"Cert/Key file not found: {cert_file}, {key_file}")
+            return
+
+    ws_server = WebSocketServer(ros_node, host, port, ssl_context)
     
     try:
         await asyncio.gather(
@@ -168,7 +184,9 @@ async def main(host, port):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='WebXR to ROS Bridge')
     parser.add_argument('--host', default='0.0.0.0', help='Host to bind to')
-    parser.add_argument('--port', type=int, default=9090, help='WebSocket port')
+    parser.add_argument('--port', type=int, default=9999, help='WebSocket port')
+    parser.add_argument('--cert', help='Path to SSL certificate (cert.pem)')
+    parser.add_argument('--key', help='Path to SSL key (key.pem)')
     args = parser.parse_args()
     
     print("""
@@ -182,4 +200,4 @@ if __name__ == "__main__":
 ╚═══════════════════════════════════════════════════════════╝
     """)
     
-    asyncio.run(main(args.host, args.port))
+    asyncio.run(main(args.host, args.port, args.cert, args.key))

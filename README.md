@@ -59,6 +59,34 @@ adb reverse tcp:9090 tcp:9090  # WebSocket
 adb devices
 ```
 
+### Wireless Streaming (LAN)
+
+For wireless connection, you must use **HTTPS** (required by WebXR) with self-signed certificates.
+
+1. **Generate Certificates**:
+   ```bash
+   bash generate_cert.sh
+   # Generates cert.pem and key.pem
+   ```
+
+2. **Run HTTPS Server** (Terminal 1):
+   ```bash
+   python https_server.py
+   # Serves at https://0.0.0.0:8000
+   ```
+
+3. **Run Secure ROS Bridge** (Terminal 2):
+   ```bash
+   python webxr_ros_bridge.py --cert cert.pem --key key.pem
+   # Listens on wss://0.0.0.0:9090
+   ```
+
+4. **On Quest Browser**:
+   - Navigate to `https://<YOUR_PC_IP>:8000/webxr_streamer.html`
+   - **Accept Security Warning**: Click "Advanced" -> "Proceed to..." (since we use self-signed certs)
+   - Ensure "PC Server IP" matches your PC's IP.
+   - Click **"Start AR Session"**.
+
 ### Start Streaming
 
 **Terminal 1** - HTTP Server:
