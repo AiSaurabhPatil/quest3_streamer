@@ -19,12 +19,6 @@ This project enables real-time, low-latency teleoperation of robots using a Meta
     - **OpenArm Bimanual**: Dual 7-DOF arm control with grippers.
     - **Franka Panda**: Single-arm teleoperation.
 
-## Video Preview
-
-![Quest 3 Streamer Demo](assets/quest3_streamer_preview.gif)
-
-> Full video available in `tutorial_video/quest3_streamer.mp4`
-
 ## Architecture Overview
 
 The system consists of three main components:
