@@ -59,10 +59,32 @@ def build_arg_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Enable periodic IK target logging",
     )
+    parser.add_argument(
+        "--record",
+        action="store_true",
+        help="Enable LeRobot dataset recording",
+    )
+    parser.add_argument(
+        "--dataset-root",
+        help="Override recording.root",
+    )
+    parser.add_argument(
+        "--dataset-repo-id",
+        help="Override recording.repo_id",
+    )
+    parser.add_argument(
+        "--task",
+        help="Override recording.task",
+    )
+    parser.add_argument(
+        "--recording-fps",
+        type=int,
+        help="Override recording.fps",
+    )
     return parser
 
 
-def resolve_runtime_settings(args: argparse.Namespace) -> tuple[object, dict, dict, bool]:
+def resolve_runtime_settings(args: argparse.Namespace) -> tuple[object, dict, dict, bool, dict]:
     if args.robot != "openarm":
         raise ValueError(f"OpenArm launcher only supports --robot openarm, got '{args.robot}'")
 
@@ -84,12 +106,31 @@ def resolve_runtime_settings(args: argparse.Namespace) -> tuple[object, dict, di
 
     teleop_config = dict(runtime.main.get("teleop", {}))
     debug_ik = bool(args.debug_ik or teleop_config.get("debug_ik", False))
-    return runtime, isaac_config, camera_config, debug_ik
+    recording_config = dict(runtime.main.get("recording", {}))
+    if args.record:
+        recording_config["enabled"] = True
+    if args.dataset_root:
+        recording_config["root"] = args.dataset_root
+        recording_config["enabled"] = True
+    if args.dataset_repo_id:
+        recording_config["repo_id"] = args.dataset_repo_id
+        recording_config["enabled"] = True
+    if args.task:
+        recording_config["task"] = args.task
+        recording_config["enabled"] = True
+    if args.recording_fps is not None:
+        recording_config["fps"] = args.recording_fps
+        recording_config["enabled"] = True
+    if args.disable_cameras:
+        recording_cameras = dict(recording_config.get("cameras", {}))
+        recording_cameras["enabled"] = False
+        recording_config["cameras"] = recording_cameras
+    return runtime, isaac_config, camera_config, debug_ik, recording_config
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_arg_parser().parse_args(argv)
-    runtime, isaac_config, camera_config, debug_ik = resolve_runtime_settings(args)
+    runtime, isaac_config, camera_config, debug_ik, recording_config = resolve_runtime_settings(args)
 
     adapter = OpenArmAdapter.from_mapping(runtime.robot, project_root=PROJECT_ROOT)
     runtime_config = build_runtime_config(
@@ -103,6 +144,8 @@ def main(argv: list[str] | None = None) -> int:
         isaac_config=isaac_config,
         camera_config=camera_config,
         debug_ik=debug_ik,
+        recording_config=recording_config,
+        project_root=PROJECT_ROOT,
     )
 
 

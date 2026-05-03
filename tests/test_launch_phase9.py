@@ -18,15 +18,36 @@ from src.launch.webxr_bridge import build_arg_parser as build_bridge_parser  # n
 class LaunchPhase9Tests(unittest.TestCase):
     def test_openarm_cli_overrides_headless_disable_cameras_and_debug_ik(self):
         parser = build_openarm_parser()
-        args = parser.parse_args(["--headless", "--disable-cameras", "--debug-ik"])
+        args = parser.parse_args(
+            [
+                "--headless",
+                "--disable-cameras",
+                "--debug-ik",
+                "--record",
+                "--dataset-root",
+                "tmp-datasets",
+                "--dataset-repo-id",
+                "local/test-openarm",
+                "--task",
+                "Test task",
+                "--recording-fps",
+                "15",
+            ]
+        )
 
-        runtime, isaac_config, camera_config, debug_ik = resolve_openarm_settings(args)
+        runtime, isaac_config, camera_config, debug_ik, recording_config = resolve_openarm_settings(args)
 
         self.assertEqual(runtime.robot_name, "openarm")
         self.assertTrue(isaac_config["headless"])
         self.assertTrue(isaac_config["simulation"]["headless"])
         self.assertFalse(camera_config["enabled"])
         self.assertTrue(debug_ik)
+        self.assertTrue(recording_config["enabled"])
+        self.assertEqual(recording_config["root"], "tmp-datasets")
+        self.assertEqual(recording_config["repo_id"], "local/test-openarm")
+        self.assertEqual(recording_config["task"], "Test task")
+        self.assertEqual(recording_config["fps"], 15)
+        self.assertFalse(recording_config["cameras"]["enabled"])
 
     def test_openarm_launcher_rejects_non_openarm_robot(self):
         parser = build_openarm_parser()

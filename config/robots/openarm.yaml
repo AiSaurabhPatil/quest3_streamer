@@ -60,3 +60,37 @@ cameras:
   wrist_right:
     prim_path: "/openarm/openarm_right_link7/right_wrist_camera"
     topic: "/camera/wrist_right/image_raw"
+
+recording:
+  robot_type: openarm
+  joint_groups:
+    left_arm:
+      source: articulation
+      joints:
+        - "openarm_left_joint1"
+        - "openarm_left_joint2"
+        - "openarm_left_joint3"
+        - "openarm_left_joint4"
+        - "openarm_left_joint5"
+        - "openarm_left_joint6"
+        - "openarm_left_joint7"
+    right_arm:
+      source: articulation
+      joints:
+        - "openarm_right_joint1"
+        - "openarm_right_joint2"
+        - "openarm_right_joint3"
+        - "openarm_right_joint4"
+        - "openarm_right_joint5"
+        - "openarm_right_joint6"
+        - "openarm_right_joint7"
+    left_gripper_scalar:
+      source: adapter
+      name: "left_gripper"
+      value: "normalized_gripper"
+      side: "left"
+    right_gripper_scalar:
+      source: adapter
+      name: "right_gripper"
+      value: "normalized_gripper"
+      side: "right"

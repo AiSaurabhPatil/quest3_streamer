@@ -61,3 +61,38 @@ class RobotAdapter(ABC):
 
     def get_diagnostics(self) -> AdapterDiagnostics:
         return AdapterDiagnostics()
+
+    def get_recording_robot_type(self) -> str:
+        return self.__class__.__name__.replace("Adapter", "").lower()
+
+    def get_articulation_vector_by_joint_names(
+        self,
+        joint_names: list[str] | tuple[str, ...],
+        joint_positions,
+    ) -> np.ndarray:
+        positions = np.asarray(joint_positions, dtype=np.float32).reshape(-1)
+        name_to_index = {name: idx for idx, name in enumerate(self.get_joint_names())}
+        missing = [name for name in joint_names if name not in name_to_index]
+        if missing:
+            raise KeyError(f"Unknown articulation joints for recording: {missing}")
+        return np.asarray([positions[name_to_index[name]] for name in joint_names], dtype=np.float32)
+
+    def get_recording_vector(
+        self,
+        *,
+        vector_config,
+        current_joint_positions,
+        commanded_action,
+        teleop_targets=None,
+    ) -> tuple[list[str], np.ndarray]:
+        mode = getattr(vector_config, "mode", None) or vector_config.get("mode", "articulation_joints")
+        if mode == "articulation_joints":
+            joint_names = list(self.get_joint_names())
+            source_positions = current_joint_positions
+            if current_joint_positions is None:
+                source_positions = commanded_action.joint_positions
+            return joint_names, self.get_articulation_vector_by_joint_names(joint_names, source_positions)
+
+        raise NotImplementedError(
+            f"{self.__class__.__name__} does not support recording mode '{mode}'"
+        )

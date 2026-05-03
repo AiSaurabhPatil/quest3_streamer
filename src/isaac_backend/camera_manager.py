@@ -70,7 +70,7 @@ class CameraManager:
         return [name for name, _ in self.viewport_cameras]
 
     def start(self):
-        if not self.config.enabled or not self.camera_specs or self.camera_publishers is None:
+        if not self.config.enabled or not self.camera_specs:
             return self
 
         import omni.replicator.core as rep
@@ -96,22 +96,25 @@ class CameraManager:
         if not self._annotators:
             return self
 
-        self._thread_running = True
-        self._publisher_thread = threading.Thread(
-            target=self._publish_loop,
-            name="camera-publish-thread",
-            daemon=True,
-        )
-        self._publisher_thread.start()
+        if self.camera_publishers is not None:
+            self._thread_running = True
+            self._publisher_thread = threading.Thread(
+                target=self._publish_loop,
+                name="camera-publish-thread",
+                daemon=True,
+            )
+            self._publisher_thread.start()
         return self
 
-    def update(self, stamp=None):
+    def update(self, stamp=None, return_frames: bool = False):
         if not self._annotators:
-            return
+            return {} if return_frames else None
 
         self._frame_counter += 1
         if self._frame_counter % self.config.publish_interval_frames != 0:
-            return
+            return {} if return_frames else None
+
+        captured_frames: dict[str, np.ndarray] = {}
 
         for camera_name, annotator in self._annotators.items():
             try:
@@ -123,14 +126,20 @@ class CameraManager:
                 if image_rgb is None:
                     continue
 
-                try:
-                    self._camera_queue.put_nowait((camera_name, image_rgb, stamp))
-                    self.diagnostics.captured_frames += 1
-                except queue.Full:
-                    self.diagnostics.dropped_frames += 1
-                    self._record_error("camera_queue_full", camera_name)
+                captured_frames[camera_name] = image_rgb
+                self.diagnostics.captured_frames += 1
+                if self.camera_publishers is not None:
+                    try:
+                        self._camera_queue.put_nowait((camera_name, image_rgb, stamp))
+                    except queue.Full:
+                        self.diagnostics.dropped_frames += 1
+                        self._record_error("camera_queue_full", camera_name)
             except Exception as exc:
                 self._record_error("capture_error", f"{camera_name}: {exc}")
+
+        if return_frames:
+            return captured_frames
+        return None
 
     def switch_viewport_camera_next(self):
         if not self.viewport_cameras:

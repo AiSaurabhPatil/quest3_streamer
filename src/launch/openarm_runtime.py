@@ -1,8 +1,17 @@
 from __future__ import annotations
 
+import time
+
 from src.isaac_backend import CameraImagePublishers, CameraManager, IsaacApp, JointStatePublisher
 from src.launch.control_metrics import ControlMetricsReporter
 from src.launch.controller_provider import build_controller_provider_class, import_ros_interfaces
+from src.recording import (
+    ButtonEdgeMapper,
+    LeRobotEpisodeRecorder,
+    RecordingConfig,
+    RecordingFrameSnapshot,
+    build_recording_schema,
+)
 from src.robot_adapters import OpenArmAdapter
 from src.teleop_core import BimanualTeleopSession, TeleopSessionConfig
 
@@ -14,13 +23,21 @@ def run_openarm_runtime(
     isaac_config: dict,
     camera_config: dict,
     debug_ik: bool,
+    recording_config: dict | None = None,
+    project_root: str | None = None,
 ) -> int:
     teleop_session = BimanualTeleopSession(runtime_config)
     isaac_app = IsaacApp(isaac_config)
+    recording_settings = RecordingConfig.from_mapping(
+        recording_config,
+        project_root=project_root or adapter.project_root,
+    )
 
     rclpy = None
     controller_provider = None
     camera_manager = None
+    recorder = None
+    recording_schema = None
     ros_started = False
 
     try:
@@ -82,7 +99,15 @@ def run_openarm_runtime(
             config=camera_config,
         ).start()
 
-        _print_ready(adapter, runtime_config, camera_manager)
+        if recording_settings.enabled:
+            recording_schema = build_recording_schema(adapter, adapter.config, recording_settings)
+            recorder = LeRobotEpisodeRecorder(
+                config=recording_settings,
+                schema=recording_schema,
+                robot_type=adapter.get_recording_robot_type(),
+            ).start()
+
+        _print_ready(adapter, runtime_config, camera_manager, recording_settings)
         _run_control_loop(
             isaac_app=isaac_app,
             adapter=adapter,
@@ -94,11 +119,16 @@ def run_openarm_runtime(
             rclpy=rclpy,
             ik_enabled=ik_enabled,
             debug_ik=debug_ik,
+            recording_settings=recording_settings,
+            recorder=recorder,
+            recording_schema=recording_schema,
         )
 
-        _print_session_statistics(adapter, camera_manager)
+        _print_session_statistics(adapter, camera_manager, recorder)
         return 0
     finally:
+        if recorder is not None:
+            recorder.close()
         if camera_manager is not None:
             camera_manager.close()
         if controller_provider is not None:
@@ -139,6 +169,7 @@ def _print_ready(
     adapter: OpenArmAdapter,
     runtime_config: TeleopSessionConfig,
     camera_manager: CameraManager,
+    recording_config: RecordingConfig,
 ) -> None:
     print("=" * 60)
     print("OpenArm Bimanual Teleop Ready")
@@ -148,13 +179,23 @@ def _print_ready(
     print("  - Left Quest Controller  -> Left Arm")
     print("  - Right Quest Controller -> Right Arm")
     print("  - Trigger/Grip -> Close Gripper")
-    print("  - A/X Button -> Camera Switch")
+    print("  - A -> Camera Switch")
+    print("  - B -> Scene Reset")
+    print("  - X -> Save Episode")
+    print("  - Y -> Discard Episode")
     print(f"  - Deadman Timeout -> {runtime_config.deadman_timeout_s * 1000.0:.0f} ms")
     print("=" * 60)
     print(
         "[Camera] Viewport cameras: "
         f"{camera_manager.viewport_camera_names or ['Perspective']}"
     )
+    if recording_config.enabled:
+        print(
+            "[Recording] Enabled: "
+            f"repo_id={recording_config.repo_id}, root={recording_config.root}, fps={recording_config.fps}"
+        )
+    else:
+        print("[Recording] Disabled")
 
 
 def _run_control_loop(
@@ -169,21 +210,32 @@ def _run_control_loop(
     rclpy,
     ik_enabled: bool,
     debug_ik: bool,
+    recording_settings: RecordingConfig,
+    recorder: LeRobotEpisodeRecorder | None,
+    recording_schema,
 ) -> None:
-    last_camera_switch = False
     ik_disabled_reported = False
     control_metrics = ControlMetricsReporter()
+    button_mapper = ButtonEdgeMapper(recording_settings.buttons)
 
     while isaac_app.is_running():
         rclpy.spin_once(controller_provider, timeout_sec=0.0)
-        session_update = teleop_session.update(controller_provider.latest())
+        latest_states = controller_provider.latest()
+        session_update = teleop_session.update(latest_states)
+        button_events = button_mapper.update(latest_states)
 
         _log_session_events(session_update.events, controller_provider)
-        last_camera_switch = _maybe_switch_camera(
-            controller_provider,
-            camera_manager,
-            last_camera_switch,
+        reset_requested = _handle_button_events(
+            button_events=button_events,
+            isaac_app=isaac_app,
+            adapter=adapter,
+            teleop_session=teleop_session,
+            camera_manager=camera_manager,
+            recorder=recorder,
         )
+        if reset_requested:
+            isaac_app.step(render=True)
+            continue
 
         if not session_update.ready:
             _handle_not_ready(
@@ -194,7 +246,8 @@ def _run_control_loop(
             )
             continue
 
-        if adapter.get_current_joint_positions() is None:
+        current_positions = adapter.get_current_joint_positions()
+        if current_positions is None:
             isaac_app.step(render=True)
             continue
 
@@ -209,7 +262,21 @@ def _run_control_loop(
         teleop_session.mark_isaac_apply()
         stamp = controller_provider.get_clock().now().to_msg()
         joint_state_publisher.publish(dof_names, action.joint_positions, stamp=stamp)
-        camera_manager.update(stamp=stamp)
+        camera_frames = camera_manager.update(
+            stamp=stamp,
+            return_frames=recorder is not None,
+        )
+
+        if recorder is not None and recording_schema is not None:
+            _maybe_record_frame(
+                adapter=adapter,
+                recorder=recorder,
+                recording_settings=recording_settings,
+                recording_schema=recording_schema,
+                current_positions=current_positions,
+                action=action,
+                camera_frames=camera_frames or {},
+            )
         control_metrics.record(session_update, adapter, controller_provider.get_logger())
 
         isaac_app.step(render=True)
@@ -223,14 +290,78 @@ def _log_session_events(events, controller_provider) -> None:
             controller_provider.get_logger().info(event.message)
 
 
-def _maybe_switch_camera(controller_provider, camera_manager, last_camera_switch: bool) -> bool:
-    camera_switch_pressed = controller_provider.camera_switch_pressed
-    if camera_switch_pressed and not last_camera_switch:
+def _handle_button_events(
+    *,
+    button_events,
+    isaac_app: IsaacApp,
+    adapter: OpenArmAdapter,
+    teleop_session: BimanualTeleopSession,
+    camera_manager: CameraManager,
+    recorder: LeRobotEpisodeRecorder | None,
+) -> bool:
+    if button_events.switch_camera:
         switched_camera = camera_manager.switch_viewport_camera_next()
         if switched_camera is not None:
             camera_name, camera_path = switched_camera
             print(f"[Camera] Switched to: {camera_name} ({camera_path})")
-    return camera_switch_pressed
+    if button_events.save_episode and recorder is not None:
+        recorder.save_episode_async(reason="quest_x")
+        print("[Recording] Save requested")
+    if button_events.discard_episode and recorder is not None:
+        recorder.discard_episode_async(reason="quest_y")
+        print("[Recording] Discard requested")
+    if button_events.reset_scene:
+        if recorder is not None:
+            recorder.discard_episode_async(reason="scene_reset")
+        print("[Scene] Reset requested")
+        _reset_scene(isaac_app, adapter, teleop_session)
+        return True
+    return False
+
+def _maybe_record_frame(
+    *,
+    adapter: OpenArmAdapter,
+    recorder: LeRobotEpisodeRecorder,
+    recording_settings: RecordingConfig,
+    recording_schema,
+    current_positions,
+    action,
+    camera_frames: dict[str, object],
+) -> None:
+    expected_cameras = {camera_spec.camera_name for camera_spec in recording_schema.camera_specs}
+    if expected_cameras and expected_cameras.difference(camera_frames):
+        return
+
+    _, state_vector = adapter.get_recording_vector(
+        vector_config=recording_settings.state,
+        current_joint_positions=current_positions,
+        commanded_action=action,
+    )
+    _, action_vector = adapter.get_recording_vector(
+        vector_config=recording_settings.action,
+        current_joint_positions=current_positions,
+        commanded_action=action,
+    )
+
+    recorder.enqueue_frame(
+        RecordingFrameSnapshot(
+            state=state_vector,
+            action=action_vector,
+            cameras={name: camera_frames[name] for name in expected_cameras},
+            task=recording_settings.task,
+            monotonic_time_s=time.monotonic(),
+        )
+    )
+
+
+def _reset_scene(
+    isaac_app: IsaacApp,
+    adapter: OpenArmAdapter,
+    teleop_session: BimanualTeleopSession,
+) -> None:
+    isaac_app.reset_world()
+    adapter.reset_runtime_state()
+    teleop_session.reset()
 
 
 def _handle_not_ready(
@@ -280,7 +411,11 @@ def _maybe_print_ik_debug(adapter: OpenArmAdapter, session_update, debug_ik: boo
         )
 
 
-def _print_session_statistics(adapter: OpenArmAdapter, camera_manager: CameraManager) -> None:
+def _print_session_statistics(
+    adapter: OpenArmAdapter,
+    camera_manager: CameraManager,
+    recorder: LeRobotEpisodeRecorder | None,
+) -> None:
     print("\n" + "=" * 60)
     diagnostics = adapter.get_diagnostics()
     print("Session Statistics:")
@@ -300,4 +435,15 @@ def _print_session_statistics(adapter: OpenArmAdapter, camera_manager: CameraMan
         f"Dropped: {camera_manager.diagnostics.dropped_frames}, "
         f"Errors: {camera_manager.diagnostics.errors}"
     )
+    if recorder is not None:
+        print(
+            "  Recording - Frames queued: "
+            f"{recorder.diagnostics.frames_enqueued}, "
+            f"written: {recorder.diagnostics.frames_written}, "
+            f"dropped: {recorder.diagnostics.frames_dropped_queue_full}, "
+            f"saved episodes: {recorder.diagnostics.saved_episodes}, "
+            f"discarded episodes: {recorder.diagnostics.discarded_episodes}"
+        )
+        if recorder.diagnostics.last_error is not None:
+            print(f"  Recording - Last error: {recorder.diagnostics.last_error}")
     print("=" * 60)

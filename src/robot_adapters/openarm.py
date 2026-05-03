@@ -253,6 +253,75 @@ class OpenArmAdapter(RobotAdapter):
         diagnostics.details["ik_enabled"] = self.ik_enabled
         return diagnostics
 
+    def reset_runtime_state(self) -> None:
+        self.left_runtime.last_arm_positions = None
+        self.right_runtime.last_arm_positions = None
+        self._smoothed_left_gripper = float(self.config["grippers"]["open_position"])
+        self._smoothed_right_gripper = float(self.config["grippers"]["open_position"])
+
+    def get_recording_vector(
+        self,
+        *,
+        vector_config,
+        current_joint_positions,
+        commanded_action,
+        teleop_targets=None,
+    ) -> tuple[list[str], np.ndarray]:
+        mode = getattr(vector_config, "mode", None)
+        if mode is None and isinstance(vector_config, dict):
+            mode = vector_config.get("mode", "articulation_joints")
+        if mode != "named_groups":
+            return super().get_recording_vector(
+                vector_config=vector_config,
+                current_joint_positions=current_joint_positions,
+                commanded_action=commanded_action,
+                teleop_targets=teleop_targets,
+            )
+
+        config_mapping = (
+            vector_config.to_mapping() if hasattr(vector_config, "to_mapping") else dict(vector_config)
+        )
+        group_names = list(config_mapping.get("groups", []))
+        joint_groups = self.config.get("recording", {}).get("joint_groups", {})
+        if not group_names:
+            raise ValueError("Recording vector config must define at least one group")
+
+        state_source = np.asarray(current_joint_positions, dtype=float).reshape(-1)
+        action_source = np.asarray(commanded_action.joint_positions, dtype=float).reshape(-1)
+        use_action_source = config_mapping.get("key") == "action"
+
+        names: list[str] = []
+        values: list[float] = []
+        for group_name in group_names:
+            group = joint_groups.get(group_name)
+            if group is None:
+                raise KeyError(f"Unknown recording joint group '{group_name}'")
+
+            source = str(group.get("source", "articulation"))
+            if source == "articulation":
+                joint_names = list(group.get("joints", []))
+                vector = self.get_articulation_vector_by_joint_names(
+                    joint_names,
+                    action_source if use_action_source else state_source,
+                )
+                names.extend(joint_names)
+                values.extend(vector.tolist())
+                continue
+
+            if source == "adapter" and group.get("value") == "normalized_gripper":
+                side = str(group.get("side", "")).strip().lower()
+                names.append(str(group.get("name", f"{side}_gripper")))
+                raw_value = self._recording_gripper_source_value(
+                    side=side,
+                    source_positions=action_source if use_action_source else state_source,
+                )
+                values.append(self._normalize_gripper(raw_value))
+                continue
+
+            raise ValueError(f"Unsupported recording group definition for '{group_name}': {group}")
+
+        return names, np.asarray(values, dtype=np.float32)
+
     def _apply_arm_ik(
         self,
         solver,
@@ -313,3 +382,24 @@ class OpenArmAdapter(RobotAdapter):
     @staticmethod
     def _indices_for(joint_names: list[str], name_to_index: dict[str, int]) -> list[int]:
         return [name_to_index[name] for name in joint_names if name in name_to_index]
+
+    def _recording_gripper_source_value(self, *, side: str, source_positions: np.ndarray) -> float:
+        if side == "left":
+            indices = self.left_gripper_indices
+        elif side == "right":
+            indices = self.right_gripper_indices
+        else:
+            raise ValueError(f"Unsupported gripper side '{side}'")
+        if not indices:
+            raise RuntimeError(f"Recording gripper indices for side '{side}' are not initialized")
+        values = np.asarray(source_positions, dtype=float).reshape(-1)[indices]
+        return float(np.mean(values))
+
+    def _normalize_gripper(self, raw_value: float) -> float:
+        open_position = float(self.config["grippers"]["open_position"])
+        closed_position = float(self.config["grippers"]["closed_position"])
+        denom = closed_position - open_position
+        if abs(denom) < 1e-9:
+            return 0.0
+        normalized = (float(raw_value) - open_position) / denom
+        return float(np.clip(normalized, 0.0, 1.0))

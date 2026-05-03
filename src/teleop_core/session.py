@@ -492,6 +492,25 @@ class BimanualTeleopSession:
             if runtime.last_controller_state is not None:
                 runtime.last_controller_state.isaac_apply_epoch_ms = float(apply_epoch_ms)
 
+    def reset(self) -> None:
+        self.calibration.reset()
+        for runtime in (self.left, self.right):
+            runtime.calibration.reset()
+            runtime.reference_position = None
+            runtime.target_pos = runtime.home_position.copy()
+            runtime.target_rot = np.array([1.0, 0.0, 0.0, 0.0], dtype=float)
+            runtime.smoothed_pos = runtime.home_position.copy()
+            runtime.smoothed_rot = runtime.target_rot.copy()
+            runtime.target_velocity_mps = np.zeros(3, dtype=float)
+            runtime.calibrated = False
+            runtime.received_pose_count = 0
+            runtime.last_processed_pose_marker = None
+            runtime.last_target_update_s = None
+            runtime.last_stale_report_s = 0.0
+            runtime.hard_timeout_active = False
+            runtime.pending_states.clear()
+            runtime.reset_filters()
+
 
 class SingleArmTeleopSession(BimanualTeleopSession):
     def __init__(

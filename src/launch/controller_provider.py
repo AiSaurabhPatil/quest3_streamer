@@ -172,9 +172,38 @@ def build_controller_provider_class(
         def latest_hand(self, hand: str):
             return self._latest_states.get(hand)
 
+        def latest_buttons(self):
+            return dict(self._buttons)
+
+        def button_pressed(self, symbol: str) -> bool:
+            if symbol == "any_primary":
+                return any(buttons.primary for buttons in self._buttons.values())
+            if symbol == "any_secondary":
+                return any(buttons.secondary for buttons in self._buttons.values())
+
+            hand, button_name = symbol.split("_", 1)
+            buttons = self._buttons.get(hand)
+            return bool(getattr(buttons, button_name, False))
+
         @property
         def camera_switch_pressed(self) -> bool:
             return any(buttons.primary for buttons in self._buttons.values())
+
+        @property
+        def right_primary_pressed(self) -> bool:
+            return self.button_pressed("right_primary")
+
+        @property
+        def right_secondary_pressed(self) -> bool:
+            return self.button_pressed("right_secondary")
+
+        @property
+        def left_primary_pressed(self) -> bool:
+            return self.button_pressed("left_primary")
+
+        @property
+        def left_secondary_pressed(self) -> bool:
+            return self.button_pressed("left_secondary")
 
         @property
         def total_pose_count(self) -> int:
