@@ -1,6 +1,8 @@
 import os
 import sys
+import tempfile
 import unittest
+from pathlib import Path
 
 import numpy as np
 
@@ -12,6 +14,7 @@ if PROJECT_ROOT not in sys.path:
 
 from src.config_loader import load_runtime_config  # noqa: E402
 from src.recording import ButtonEdgeMapper, RecordingConfig, build_recording_schema  # noqa: E402
+from src.recording.worker_process import _validate_existing_dataset_root  # noqa: E402
 from src.robot_adapters import OpenArmAdapter, RobotAction  # noqa: E402
 from src.teleop_core import ControllerButtons, ControllerState  # noqa: E402
 
@@ -127,6 +130,15 @@ class RecordingTests(unittest.TestCase):
         self.assertEqual(vector.shape, (16,))
         self.assertAlmostEqual(vector[7], 0.0)
         self.assertAlmostEqual(vector[-1], 1.0)
+
+    def test_incomplete_lerobot_dataset_root_gets_clear_error(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            dataset_root = Path(temp_dir) / "local" / "quest3-openarm"
+            (dataset_root / "meta").mkdir(parents=True)
+            (dataset_root / "meta" / "info.json").write_text("{}", encoding="utf-8")
+
+            with self.assertRaisesRegex(RuntimeError, "already exists but is incomplete"):
+                _validate_existing_dataset_root(dataset_root)
 
 
 if __name__ == "__main__":

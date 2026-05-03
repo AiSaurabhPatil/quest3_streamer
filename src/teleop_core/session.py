@@ -193,6 +193,24 @@ class _HandRuntime:
         if self.orientation_filter is not None:
             self.orientation_filter.reset(self.target_rot)
 
+    def reset_runtime_state(self, *, preserve_calibration: bool) -> None:
+        if not preserve_calibration:
+            self.calibration.reset()
+            self.reference_position = None
+            self.calibrated = False
+        self.target_pos = self.home_position.copy()
+        self.target_rot = np.array([1.0, 0.0, 0.0, 0.0], dtype=float)
+        self.smoothed_pos = self.home_position.copy()
+        self.smoothed_rot = self.target_rot.copy()
+        self.target_velocity_mps = np.zeros(3, dtype=float)
+        self.received_pose_count = 0
+        self.last_processed_pose_marker = None
+        self.last_target_update_s = None
+        self.last_stale_report_s = 0.0
+        self.hard_timeout_active = False
+        self.pending_states.clear()
+        self.reset_filters()
+
 
 class BimanualTeleopSession:
     def __init__(
@@ -492,24 +510,11 @@ class BimanualTeleopSession:
             if runtime.last_controller_state is not None:
                 runtime.last_controller_state.isaac_apply_epoch_ms = float(apply_epoch_ms)
 
-    def reset(self) -> None:
-        self.calibration.reset()
+    def reset(self, *, preserve_calibration: bool = False) -> None:
+        if not preserve_calibration:
+            self.calibration.reset()
         for runtime in (self.left, self.right):
-            runtime.calibration.reset()
-            runtime.reference_position = None
-            runtime.target_pos = runtime.home_position.copy()
-            runtime.target_rot = np.array([1.0, 0.0, 0.0, 0.0], dtype=float)
-            runtime.smoothed_pos = runtime.home_position.copy()
-            runtime.smoothed_rot = runtime.target_rot.copy()
-            runtime.target_velocity_mps = np.zeros(3, dtype=float)
-            runtime.calibrated = False
-            runtime.received_pose_count = 0
-            runtime.last_processed_pose_marker = None
-            runtime.last_target_update_s = None
-            runtime.last_stale_report_s = 0.0
-            runtime.hard_timeout_active = False
-            runtime.pending_states.clear()
-            runtime.reset_filters()
+            runtime.reset_runtime_state(preserve_calibration=preserve_calibration)
 
 
 class SingleArmTeleopSession(BimanualTeleopSession):
@@ -572,3 +577,8 @@ class SingleArmTeleopSession(BimanualTeleopSession):
         apply_epoch_ms = time.time() * 1000.0 if apply_epoch_ms is None else apply_epoch_ms
         if self.arm.last_controller_state is not None:
             self.arm.last_controller_state.isaac_apply_epoch_ms = float(apply_epoch_ms)
+
+    def reset(self, *, preserve_calibration: bool = False) -> None:
+        if not preserve_calibration:
+            self.calibration.reset()
+        self.arm.reset_runtime_state(preserve_calibration=preserve_calibration)

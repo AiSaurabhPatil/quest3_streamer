@@ -119,7 +119,28 @@ The A/X buttons cycle through available cameras:
 
 ### Data Recording (LeRobot)
 
-The OpenArm teleop script publishes data for recording:
+The OpenArm teleop script can record episodes directly into a LeRobot dataset:
+
+```bash
+./scripts/run_openarm_teleop.sh \
+  --record \
+  --dataset-root datasets \
+  --dataset-repo-id local/quest3-openarm \
+  --task "Teleoperate OpenArm to complete the task" \
+  --recording-fps 30 \
+  --max-episodes 10
+```
+
+Recording uses a separate LeRobot writer process so Isaac Sim's Python environment
+does not need LeRobot installed. By default the writer runs with `.venv/bin/python`;
+override it with `LEROBOT_RECORDING_PYTHON` if you keep LeRobot elsewhere:
+
+```bash
+.venv/bin/python -m pip install "lerobot>=0.4.0"
+LEROBOT_RECORDING_PYTHON=/path/to/lerobot-env/bin/python ./scripts/run_openarm_teleop.sh --record
+```
+
+The OpenArm teleop script also publishes data for external recording:
 
 | Topic | Type | Description |
 |-------|------|-------------|

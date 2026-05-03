@@ -230,6 +230,78 @@ class SessionTests(unittest.TestCase):
             any("RIGHT controller hard timeout" in event.message for event in stale.events)
         )
 
+    def test_session_reset_preserves_calibration_when_requested(self):
+        config = TeleopSessionConfig(
+            robot_workspace_center=[0.3, 0.0, 0.3],
+            left_arm_offset=[0.0, 0.15, 0.0],
+            right_arm_offset=[0.0, -0.15, 0.0],
+            smoothing=0.0,
+            calibration_samples=1,
+        )
+        session = BimanualTeleopSession(
+            config,
+            frame_transform=FrameTransform(np.eye(3), np.eye(3)),
+        )
+
+        left = ControllerState(
+            hand="left",
+            receive_time_s=1.0,
+            source_timestamp=1.0,
+            pose=ControllerPose([1.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0]),
+        )
+        right = ControllerState(
+            hand="right",
+            receive_time_s=1.0,
+            source_timestamp=1.0,
+            pose=ControllerPose([0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 1.0]),
+        )
+        session.update({"left": left, "right": right}, now_s=1.0)
+
+        left_reference = session.left.reference_position.copy()
+        right_reference = session.right.reference_position.copy()
+
+        session.reset(preserve_calibration=True)
+
+        self.assertTrue(session.left.calibrated)
+        self.assertTrue(session.right.calibrated)
+        np.testing.assert_allclose(session.left.reference_position, left_reference)
+        np.testing.assert_allclose(session.right.reference_position, right_reference)
+        np.testing.assert_allclose(session.left.target_pos, [0.3, 0.15, 0.3])
+        np.testing.assert_allclose(session.right.target_pos, [0.3, -0.15, 0.3])
+
+    def test_session_reset_clears_calibration_by_default(self):
+        config = TeleopSessionConfig(
+            smoothing=0.0,
+            calibration_samples=1,
+        )
+        session = BimanualTeleopSession(
+            config,
+            frame_transform=FrameTransform(np.eye(3), np.eye(3)),
+        )
+
+        left = ControllerState(
+            hand="left",
+            receive_time_s=1.0,
+            source_timestamp=1.0,
+            pose=ControllerPose([1.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0]),
+        )
+        right = ControllerState(
+            hand="right",
+            receive_time_s=1.0,
+            source_timestamp=1.0,
+            pose=ControllerPose([0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 1.0]),
+        )
+        session.update({"left": left, "right": right}, now_s=1.0)
+
+        session.reset()
+
+        self.assertFalse(session.left.calibrated)
+        self.assertFalse(session.right.calibrated)
+        self.assertIsNone(session.left.reference_position)
+        self.assertIsNone(session.right.reference_position)
+        self.assertEqual(session.calibration.status.left_samples, 0)
+        self.assertEqual(session.calibration.status.right_samples, 0)
+
     def test_single_arm_session_generates_targets_with_prediction(self):
         config = TeleopSessionConfig(
             robot_workspace_center=[0.5, 0.0, 0.4],

@@ -127,11 +127,16 @@ def run_openarm_runtime(
 
         if recording_settings.enabled:
             recording_schema = build_recording_schema(adapter, adapter.config, recording_settings)
-            recorder = LeRobotEpisodeRecorder(
-                config=recording_settings,
-                schema=recording_schema,
-                robot_type=adapter.get_recording_robot_type(),
-            ).start()
+            try:
+                recorder = LeRobotEpisodeRecorder(
+                    config=recording_settings,
+                    schema=recording_schema,
+                    robot_type=adapter.get_recording_robot_type(),
+                    project_root=project_root or adapter.project_root,
+                ).start()
+            except Exception as exc:
+                print(f"[Recording] Failed to start LeRobot recorder: {exc}")
+                return 1
 
         _print_ready(adapter, runtime_config, camera_manager, recording_settings)
         _run_control_loop(
@@ -154,14 +159,27 @@ def run_openarm_runtime(
         return 0
     finally:
         if recorder is not None:
-            recorder.close()
+            _cleanup_resource("close recorder", recorder.close)
         if camera_manager is not None:
-            camera_manager.close()
+            _cleanup_resource("close camera manager", camera_manager.close)
         if controller_provider is not None:
-            controller_provider.destroy_node()
+            _cleanup_resource("destroy ROS controller node", controller_provider.destroy_node)
         if ros_started and rclpy is not None:
-            rclpy.shutdown()
-        isaac_app.close()
+            _cleanup_resource("shutdown ROS", rclpy.shutdown)
+        _cleanup_resource("close Isaac app", isaac_app.close)
+
+
+def _cleanup_resource(label: str, cleanup) -> None:
+    try:
+        cleanup()
+    except Exception as exc:
+        if label == "destroy ROS controller node" and _is_known_ros_destroy_node_cleanup_error(exc):
+            return
+        print(f"[Cleanup] Warning: failed to {label}: {type(exc).__name__}: {exc}")
+
+
+def _is_known_ros_destroy_node_cleanup_error(exc: Exception) -> bool:
+    return isinstance(exc, ValueError) and str(exc) == "list.remove(x): x not in list"
 
 
 def _initialize_ik(adapter: OpenArmAdapter) -> bool:
@@ -465,7 +483,7 @@ def _reset_scene(
 ) -> None:
     isaac_app.reset_world()
     adapter.reset_runtime_state()
-    teleop_session.reset()
+    teleop_session.reset(preserve_calibration=True)
 
 
 def _handle_not_ready(

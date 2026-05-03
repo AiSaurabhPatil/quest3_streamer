@@ -172,8 +172,10 @@ class CameraManager:
             if render_product is None:
                 continue
             try:
-                annotator.detach([render_product])
+                annotator.detach([_render_product_detach_target(render_product)])
             except Exception as exc:
+                if _is_known_replicator_detach_mismatch(exc):
+                    continue
                 self._record_error("camera_detach_error", f"{camera_name}: {exc}")
 
         self._annotators.clear()
@@ -218,3 +220,32 @@ class CameraManager:
 
         self._last_error_log_s[key] = now_s
         print(f"[Camera] {key}: {detail}")
+
+
+def _render_product_detach_target(render_product):
+    for attribute_name in ("path", "render_product_path"):
+        value = getattr(render_product, attribute_name, None)
+        if value is None:
+            continue
+        if callable(value):
+            value = value()
+        if value:
+            return str(value)
+
+    for method_name in ("get_path", "get_render_product_path"):
+        method = getattr(render_product, method_name, None)
+        if method is None:
+            continue
+        value = method()
+        if value:
+            return str(value)
+
+    return render_product
+
+
+def _is_known_replicator_detach_mismatch(exc: Exception) -> bool:
+    return (
+        isinstance(exc, AttributeError)
+        and "HydraTexture" in str(exc)
+        and "split" in str(exc)
+    )
