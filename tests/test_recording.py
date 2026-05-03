@@ -29,12 +29,16 @@ class RecordingTests(unittest.TestCase):
         self.assertTrue(config.enabled)
         self.assertEqual(config.root, os.path.join(PROJECT_ROOT, "datasets/test"))
         self.assertEqual(config.buttons.save_episode, "left_primary")
+        self.assertEqual(config.buttons.start_episode, "left_secondary")
         self.assertEqual(config.cameras.resolution, (480, 360))
 
     def test_button_edge_mapper_only_emits_rising_edges(self):
         mapper = ButtonEdgeMapper(RecordingConfig.from_mapping({}, project_root=PROJECT_ROOT).buttons)
 
-        left_pressed = ControllerState(hand="left", buttons=ControllerButtons(primary=True))
+        left_pressed = ControllerState(
+            hand="left",
+            buttons=ControllerButtons(primary=True, secondary=True),
+        )
         right_pressed = ControllerState(hand="right", buttons=ControllerButtons(secondary=True))
 
         first = mapper.update({"left": left_pressed, "right": right_pressed})
@@ -48,8 +52,10 @@ class RecordingTests(unittest.TestCase):
 
         self.assertTrue(first.save_episode)
         self.assertTrue(first.reset_scene)
+        self.assertTrue(first.start_episode)
         self.assertFalse(second.save_episode)
         self.assertFalse(second.reset_scene)
+        self.assertFalse(second.start_episode)
         self.assertFalse(released.save_episode)
 
     def test_openarm_recording_schema_uses_named_groups_and_cameras(self):

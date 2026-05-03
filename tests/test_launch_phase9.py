@@ -32,6 +32,8 @@ class LaunchPhase9Tests(unittest.TestCase):
                 "Test task",
                 "--recording-fps",
                 "15",
+                "--max-episodes",
+                "5",
             ]
         )
 
@@ -47,6 +49,7 @@ class LaunchPhase9Tests(unittest.TestCase):
         self.assertEqual(recording_config["repo_id"], "local/test-openarm")
         self.assertEqual(recording_config["task"], "Test task")
         self.assertEqual(recording_config["fps"], 15)
+        self.assertEqual(recording_config["max_episodes"], 5)
         self.assertFalse(recording_config["cameras"]["enabled"])
 
     def test_openarm_launcher_rejects_non_openarm_robot(self):

@@ -20,7 +20,7 @@ class RecordingButtonConfig:
     switch_camera: str = "right_primary"
     reset_scene: str = "right_secondary"
     save_episode: str = "left_primary"
-    discard_episode: str = "left_secondary"
+    start_episode: str = "left_secondary"
 
     @classmethod
     def from_mapping(cls, values: dict[str, Any] | None):
@@ -29,7 +29,7 @@ class RecordingButtonConfig:
             switch_camera=str(values.get("switch_camera", "right_primary")),
             reset_scene=str(values.get("reset_scene", "right_secondary")),
             save_episode=str(values.get("save_episode", "left_primary")),
-            discard_episode=str(values.get("discard_episode", "left_secondary")),
+            start_episode=str(values.get("start_episode", values.get("discard_episode", "left_secondary"))),
         )
         config.validate()
         return config
@@ -39,7 +39,7 @@ class RecordingButtonConfig:
             self.switch_camera,
             self.reset_scene,
             self.save_episode,
-            self.discard_episode,
+            self.start_episode,
         ):
             if value not in VALID_BUTTON_SYMBOLS:
                 raise ValueError(f"Unsupported recording button symbol '{value}'")
@@ -118,8 +118,9 @@ class RecordingConfig:
     repo_id: str = "local/quest3-openarm"
     task: str = "Teleoperate OpenArm to complete the task"
     fps: int = 30
+    max_episodes: int | None = None
     start_after_calibration: bool = True
-    auto_start_episode: bool = True
+    auto_start_episode: bool = False
     use_videos: bool = True
     streaming_encoding: bool = True
     vcodec: str = "auto"
@@ -154,8 +155,11 @@ class RecordingConfig:
             repo_id=str(values.get("repo_id", "local/quest3-openarm")),
             task=str(values.get("task", "Teleoperate OpenArm to complete the task")),
             fps=int(values.get("fps", 30)),
+            max_episodes=(
+                None if values.get("max_episodes") in (None, "") else int(values.get("max_episodes"))
+            ),
             start_after_calibration=bool(values.get("start_after_calibration", True)),
-            auto_start_episode=bool(values.get("auto_start_episode", True)),
+            auto_start_episode=bool(values.get("auto_start_episode", False)),
             use_videos=bool(values.get("use_videos", True)),
             streaming_encoding=bool(values.get("streaming_encoding", True)),
             vcodec=str(values.get("vcodec", "auto")),
@@ -186,6 +190,8 @@ class RecordingConfig:
     def validate(self) -> None:
         if self.fps <= 0:
             raise ValueError("Recording fps must be positive")
+        if self.max_episodes is not None and self.max_episodes < 1:
+            raise ValueError("Recording max_episodes must be at least 1 when provided")
         if self.queue_size_frames < 1:
             raise ValueError("Recording queue_size_frames must be at least 1")
         if self.encoder_threads < 1:

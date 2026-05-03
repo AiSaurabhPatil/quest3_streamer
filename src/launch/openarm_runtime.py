@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 import time
 
 from src.isaac_backend import CameraImagePublishers, CameraManager, IsaacApp, JointStatePublisher
@@ -14,6 +15,31 @@ from src.recording import (
 )
 from src.robot_adapters import OpenArmAdapter
 from src.teleop_core import BimanualTeleopSession, TeleopSessionConfig
+
+
+@dataclass
+class RecordingLoopState:
+    target_episodes: int | None
+    recording_active: bool = False
+    awaiting_save_completion: bool = False
+    awaiting_discard_completion: bool = False
+    last_saved_reported: int = 0
+    last_discarded_reported: int = 0
+
+    def has_reached_target(self, saved_episodes: int) -> bool:
+        return self.target_episodes is not None and saved_episodes >= self.target_episodes
+
+    def progress_text(self, saved_episodes: int | None = None) -> str:
+        completed = self.last_saved_reported if saved_episodes is None else saved_episodes
+        if self.target_episodes is None:
+            return f"{completed} saved"
+        return f"{completed}/{self.target_episodes} saved"
+
+    def next_episode_label(self, saved_episodes: int) -> str:
+        next_episode = saved_episodes + 1
+        if self.target_episodes is None:
+            return f"episode {next_episode}"
+        return f"episode {next_episode}/{self.target_episodes}"
 
 
 def run_openarm_runtime(
@@ -182,7 +208,7 @@ def _print_ready(
     print("  - A -> Camera Switch")
     print("  - B -> Scene Reset")
     print("  - X -> Save Episode")
-    print("  - Y -> Discard Episode")
+    print("  - Y -> Start Episode Recording")
     print(f"  - Deadman Timeout -> {runtime_config.deadman_timeout_s * 1000.0:.0f} ms")
     print("=" * 60)
     print(
@@ -192,8 +218,10 @@ def _print_ready(
     if recording_config.enabled:
         print(
             "[Recording] Enabled: "
-            f"repo_id={recording_config.repo_id}, root={recording_config.root}, fps={recording_config.fps}"
+            f"repo_id={recording_config.repo_id}, root={recording_config.root}, "
+            f"fps={recording_config.fps}, max_episodes={recording_config.max_episodes}"
         )
+        print("[Recording] Press Y to start each episode after your setup is ready")
     else:
         print("[Recording] Disabled")
 
@@ -217,12 +245,22 @@ def _run_control_loop(
     ik_disabled_reported = False
     control_metrics = ControlMetricsReporter()
     button_mapper = ButtonEdgeMapper(recording_settings.buttons)
+    recording_state = RecordingLoopState(
+        target_episodes=recording_settings.max_episodes,
+        recording_active=recording_settings.auto_start_episode and recorder is not None,
+    )
+
+    if recorder is not None:
+        _print_recording_waiting_status(recording_state, recorder)
 
     while isaac_app.is_running():
         rclpy.spin_once(controller_provider, timeout_sec=0.0)
         latest_states = controller_provider.latest()
         session_update = teleop_session.update(latest_states)
         button_events = button_mapper.update(latest_states)
+
+        if recorder is not None and _sync_recording_progress(recording_state, recorder):
+            break
 
         _log_session_events(session_update.events, controller_provider)
         reset_requested = _handle_button_events(
@@ -232,6 +270,8 @@ def _run_control_loop(
             teleop_session=teleop_session,
             camera_manager=camera_manager,
             recorder=recorder,
+            recording_state=recording_state,
+            session_ready=session_update.ready,
         )
         if reset_requested:
             isaac_app.step(render=True)
@@ -267,7 +307,7 @@ def _run_control_loop(
             return_frames=recorder is not None,
         )
 
-        if recorder is not None and recording_schema is not None:
+        if recorder is not None and recording_schema is not None and recording_state.recording_active:
             _maybe_record_frame(
                 adapter=adapter,
                 recorder=recorder,
@@ -298,6 +338,8 @@ def _handle_button_events(
     teleop_session: BimanualTeleopSession,
     camera_manager: CameraManager,
     recorder: LeRobotEpisodeRecorder | None,
+    recording_state: RecordingLoopState,
+    session_ready: bool,
 ) -> bool:
     if button_events.switch_camera:
         switched_camera = camera_manager.switch_viewport_camera_next()
@@ -305,18 +347,80 @@ def _handle_button_events(
             camera_name, camera_path = switched_camera
             print(f"[Camera] Switched to: {camera_name} ({camera_path})")
     if button_events.save_episode and recorder is not None:
-        recorder.save_episode_async(reason="quest_x")
-        print("[Recording] Save requested")
-    if button_events.discard_episode and recorder is not None:
-        recorder.discard_episode_async(reason="quest_y")
-        print("[Recording] Discard requested")
+        if not recording_state.recording_active:
+            print("[Recording] Ignored save request because no episode is currently recording")
+        elif recording_state.awaiting_save_completion or recording_state.awaiting_discard_completion:
+            print("[Recording] Save already in progress; waiting for recorder to finish")
+        else:
+            recording_state.recording_active = False
+            recording_state.awaiting_save_completion = True
+            print(f"[Recording] Save requested for {recording_state.next_episode_label(recorder.diagnostics.saved_episodes)}")
+            recorder.save_episode_async(reason="quest_x")
+    if button_events.start_episode and recorder is not None:
+        if not session_ready:
+            print("[Recording] Wait for calibration to complete before starting an episode")
+        elif recording_state.awaiting_save_completion or recording_state.awaiting_discard_completion:
+            print("[Recording] Waiting for previous save/discard to complete before starting the next episode")
+        elif recording_state.recording_active:
+            print("[Recording] Episode recording is already active")
+        elif recording_state.has_reached_target(recorder.diagnostics.saved_episodes):
+            print(f"[Recording] Episode target already reached: {recording_state.progress_text(recorder.diagnostics.saved_episodes)}")
+        else:
+            recording_state.recording_active = True
+            print(f"[Recording] Started {recording_state.next_episode_label(recorder.diagnostics.saved_episodes)}")
     if button_events.reset_scene:
         if recorder is not None:
+            recording_state.recording_active = False
+            recording_state.awaiting_save_completion = False
+            recording_state.awaiting_discard_completion = True
             recorder.discard_episode_async(reason="scene_reset")
         print("[Scene] Reset requested")
         _reset_scene(isaac_app, adapter, teleop_session)
         return True
     return False
+
+
+def _sync_recording_progress(
+    recording_state: RecordingLoopState,
+    recorder: LeRobotEpisodeRecorder,
+) -> bool:
+    diagnostics = recorder.diagnostics
+
+    if diagnostics.discarded_episodes != recording_state.last_discarded_reported:
+        recording_state.last_discarded_reported = diagnostics.discarded_episodes
+        recording_state.awaiting_discard_completion = False
+        print("[Recording] Cleared unsaved episode buffer")
+        _print_recording_waiting_status(recording_state, recorder)
+
+    if diagnostics.saved_episodes != recording_state.last_saved_reported:
+        recording_state.last_saved_reported = diagnostics.saved_episodes
+        recording_state.awaiting_save_completion = False
+        print(f"[Recording] Saved {recording_state.progress_text(diagnostics.saved_episodes)}")
+        if recording_state.has_reached_target(diagnostics.saved_episodes):
+            print("[Recording] Target episode count reached; stopping teleoperation")
+            return True
+        _print_recording_waiting_status(recording_state, recorder)
+
+    return False
+
+
+def _print_recording_waiting_status(
+    recording_state: RecordingLoopState,
+    recorder: LeRobotEpisodeRecorder,
+) -> None:
+    if recording_state.has_reached_target(recorder.diagnostics.saved_episodes):
+        print(f"[Recording] Target reached: {recording_state.progress_text(recorder.diagnostics.saved_episodes)}")
+        return
+    if recording_state.awaiting_save_completion:
+        print("[Recording] Waiting for save to finish...")
+        return
+    if recording_state.awaiting_discard_completion:
+        print("[Recording] Waiting for buffer clear to finish...")
+        return
+    if recording_state.recording_active:
+        print(f"[Recording] Active: {recording_state.next_episode_label(recorder.diagnostics.saved_episodes)}")
+        return
+    print(f"[Recording] Ready to start {recording_state.next_episode_label(recorder.diagnostics.saved_episodes)} with Y")
 
 def _maybe_record_frame(
     *,

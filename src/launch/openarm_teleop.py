@@ -81,6 +81,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
         type=int,
         help="Override recording.fps",
     )
+    parser.add_argument(
+        "--max-episodes",
+        type=int,
+        help="Stop after this many saved episodes",
+    )
     return parser
 
 
@@ -120,6 +125,9 @@ def resolve_runtime_settings(args: argparse.Namespace) -> tuple[object, dict, di
         recording_config["enabled"] = True
     if args.recording_fps is not None:
         recording_config["fps"] = args.recording_fps
+        recording_config["enabled"] = True
+    if args.max_episodes is not None:
+        recording_config["max_episodes"] = args.max_episodes
         recording_config["enabled"] = True
     if args.disable_cameras:
         recording_cameras = dict(recording_config.get("cameras", {}))

@@ -10,7 +10,7 @@ class RecordingButtonEvents:
     switch_camera: bool = False
     reset_scene: bool = False
     save_episode: bool = False
-    discard_episode: bool = False
+    start_episode: bool = False
 
 
 class ButtonEdgeMapper:
@@ -20,7 +20,7 @@ class ButtonEdgeMapper:
             "switch_camera": False,
             "reset_scene": False,
             "save_episode": False,
-            "discard_episode": False,
+            "start_episode": False,
         }
 
     def update(self, latest_states: dict[str, object | None]) -> RecordingButtonEvents:
@@ -28,13 +28,13 @@ class ButtonEdgeMapper:
             "switch_camera": self._resolve_symbol(self._config.switch_camera, latest_states),
             "reset_scene": self._resolve_symbol(self._config.reset_scene, latest_states),
             "save_episode": self._resolve_symbol(self._config.save_episode, latest_states),
-            "discard_episode": self._resolve_symbol(self._config.discard_episode, latest_states),
+            "start_episode": self._resolve_symbol(self._config.start_episode, latest_states),
         }
         events = RecordingButtonEvents(
             switch_camera=current["switch_camera"] and not self._previous["switch_camera"],
             reset_scene=current["reset_scene"] and not self._previous["reset_scene"],
             save_episode=current["save_episode"] and not self._previous["save_episode"],
-            discard_episode=current["discard_episode"] and not self._previous["discard_episode"],
+            start_episode=current["start_episode"] and not self._previous["start_episode"],
         )
         self._previous = current
         return events

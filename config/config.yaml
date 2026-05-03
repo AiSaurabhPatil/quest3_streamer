@@ -63,6 +63,20 @@ cameras:
   log_errors: true
   error_log_interval_s: 5.0
 
+recording:
+  enabled: false
+  root: "datasets"
+  repo_id: "local/quest3-openarm"
+  task: "Teleoperate OpenArm to complete the task"
+  fps: 30
+  max_episodes: null
+  auto_start_episode: false
+  buttons:
+    switch_camera: "right_primary"
+    reset_scene: "right_secondary"
+    save_episode: "left_primary"
+    start_episode: "left_secondary"
+
 # Teleoperation safety configuration
 teleop:
   calibration_samples: 30
