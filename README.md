@@ -7,6 +7,7 @@ Stream real-time controller data from Meta Quest 3 to ROS 2 for robot teleoperat
 - **Full Controller Tracking**: 6DoF pose, trigger, grip, thumbstick, buttons (A/B/X/Y)
 - **Bimanual Teleoperation**: Control dual-arm robots with both Quest controllers
 - **WebXR Wireless Streaming**: Low-latency via HTTPS over WiFi
+- **Remote Ingress Mode**: Forward compact controller packets from a local LAN ingress to a remote Isaac server over VPN
 - **ROS 2 Integration**: Publishes `PoseStamped` and `Joy` messages
 - **Isaac Sim Ready**: Supports OpenArm bimanual  and Franka Panda
 - **Multi-Camera Support**: Head and wrist cameras with switchable views
@@ -79,6 +80,28 @@ This starts both HTTPS server and ROS bridge. On Quest browser:
 2. Accept security warning (self-signed cert)
 3. Click **"Start AR Session"**
 
+### Remote Isaac Server Over VPN
+
+Run a local ingress near the Quest:
+
+```bash
+python src/webxr_ros_bridge.py \
+  --mode ingress \
+  --host 0.0.0.0 \
+  --port 9999 \
+  --cert certs/cert.pem \
+  --key certs/key.pem \
+  --forward-url ws://<REMOTE_SERVER_IP>:9998
+```
+
+Run the remote receiver near Isaac Sim:
+
+```bash
+python src/webxr_ros_bridge.py --mode remote-receiver --host 0.0.0.0 --port 9998
+```
+
+The bridge now logs compact transport metrics such as packet rate, jitter, end-to-end packet age, and VPN hop age.
+
 ### Isaac Sim Teleoperation
 
 #### OpenArm Bimanual Robot
@@ -138,8 +161,13 @@ paths:
     key: "certs/key.pem"
 
 server:
-  websocket_port: 9090
+  host: "0.0.0.0"
+  websocket_port: 9999
   https_port: 8000
+
+teleop:
+  deadman_timeout_ms: 250
+  hard_timeout_ms: 1000
 ```
 
 ## ROS Topics

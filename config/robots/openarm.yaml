@@ -1,0 +1,62 @@
+robot_type: openarm
+usd: "openarm_config/openarm_bimanual/openarm_bimanual.usd"
+urdf: "openarm_config/openarm_bimanual_stl.urdf"
+left_arm_config: "openarm_config/left_arm"
+right_arm_config: "openarm_config/right_arm"
+
+prim_search_paths:
+  - "/World/Robot"
+  - "/World/openarm"
+  - "/openarm"
+  - "/Robot"
+  - "/Environment/openarm"
+  - "/World/openarm_bimanual"
+
+left_arm:
+  frame_name: "openarm_left_hand"
+  joints:
+    - "openarm_left_joint1"
+    - "openarm_left_joint2"
+    - "openarm_left_joint3"
+    - "openarm_left_joint4"
+    - "openarm_left_joint5"
+    - "openarm_left_joint6"
+    - "openarm_left_joint7"
+  preferred_config: [0.0, -1.0, 0.0, 1.2, 0.0, 0.0, 0.0]
+  workspace_offset: [0.0, 0.15, 0.0]
+
+right_arm:
+  frame_name: "openarm_right_hand"
+  joints:
+    - "openarm_right_joint1"
+    - "openarm_right_joint2"
+    - "openarm_right_joint3"
+    - "openarm_right_joint4"
+    - "openarm_right_joint5"
+    - "openarm_right_joint6"
+    - "openarm_right_joint7"
+  preferred_config: [0.0, 1.0, 0.0, 1.2, 0.0, 0.0, 0.0]
+  workspace_offset: [0.0, -0.15, 0.0]
+
+grippers:
+  open_position: 0.132
+  closed_position: -1.0
+  speed: 0.05
+  threshold: 0.5
+  left_joints:
+    - "openarm_left_finger_joint1"
+    - "openarm_left_finger_joint2"
+  right_joints:
+    - "openarm_right_finger_joint1"
+    - "openarm_right_finger_joint2"
+
+cameras:
+  head:
+    prim_path: "/openarm/openarm_body_link/head_camera"
+    topic: "/camera/head/image_raw"
+  wrist_left:
+    prim_path: "/openarm/openarm_left_link7/left_wrist_camera"
+    topic: "/camera/wrist_left/image_raw"
+  wrist_right:
+    prim_path: "/openarm/openarm_right_link7/right_wrist_camera"
+    topic: "/camera/wrist_right/image_raw"

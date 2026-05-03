@@ -27,7 +27,7 @@ https://<YOUR_PC_IP>:8000/web/webxr_streamer.html
 |-------|----------|
 | ROS bridge not running | Run `./scripts/run_wireless.sh` or `python src/webxr_ros_bridge.py` |
 | Wrong IP address | Enter your PC's correct IP in the WebXR form |
-| Firewall blocking | Allow ports 8000 and 9090 through firewall |
+| Firewall blocking | Allow ports 8000 and 9999 through firewall |
 | Different WiFi networks | Ensure Quest and PC are on same network |
 
 **Debug Steps**:
@@ -39,14 +39,14 @@ https://<YOUR_PC_IP>:8000/web/webxr_streamer.html
 
 2. Test WebSocket port:
    ```bash
-   curl -v https://localhost:9090 --insecure
+   curl -v https://localhost:9999 --insecure
    ```
 
 3. Check firewall:
    ```bash
    sudo ufw status
    sudo ufw allow 8000
-   sudo ufw allow 9090
+   sudo ufw allow 9999
    ```
 
 ---

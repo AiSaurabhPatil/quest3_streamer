@@ -14,7 +14,7 @@ This single command:
 
 1. Generates SSL certificates if missing
 2. Starts HTTPS server on port 8000
-3. Starts WebSocket ROS bridge on port 9090
+3. Starts WebSocket ROS bridge on port 9999
 4. Prints the URL for your Quest browser
 
 ### Connect From Quest 3
@@ -49,6 +49,26 @@ Echo a topic to see live data:
 ```bash
 ros2 topic echo /quest/right_hand/pose
 ```
+
+### Remote Isaac Server Over VPN
+
+If Isaac Sim is running on a remote machine, keep the Quest talking to a nearby ingress and forward compact controller packets over the VPN:
+
+```bash
+# Local machine near the Quest
+python src/webxr_ros_bridge.py \
+  --mode ingress \
+  --host 0.0.0.0 \
+  --port 9999 \
+  --cert certs/cert.pem \
+  --key certs/key.pem \
+  --forward-url ws://<REMOTE_SERVER_IP>:9998
+
+# Remote machine near Isaac Sim
+python src/webxr_ros_bridge.py --mode remote-receiver --host 0.0.0.0 --port 9998
+```
+
+The transport bridge logs packet rate, drop percentage, jitter, end-to-end packet age, and VPN hop age to help diagnose remote-control issues.
 
 ---
 
@@ -197,8 +217,19 @@ Edit `config/config.yaml`:
 
 ```yaml
 server:
-  websocket_port: 9090  # WebSocket for controller data
+  host: "0.0.0.0"
+  websocket_port: 9999  # WebSocket for controller data
   https_port: 8000      # HTTPS for WebXR page
+```
+
+### Deadman Timeout
+
+Edit `config/config.yaml`:
+
+```yaml
+teleop:
+  deadman_timeout_ms: 250  # Hold targets after stale controller data
+  hard_timeout_ms: 1000    # Open grippers after a longer stream loss
 ```
 
 ### IK Configuration

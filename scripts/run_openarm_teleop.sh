@@ -8,11 +8,23 @@ export RMW_IMPLEMENTATION=rmw_fastrtps_cpp
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
 PROJECT_ROOT=$(dirname "$SCRIPT_DIR")
 
-# Isaac Sim installation path
-ISAAC_SIM_PATH="/home/saurabh/isaac_sim"
+# Isaac Sim installation path from env override or the shared config loader
+CONFIG_FILE="$PROJECT_ROOT/config/config.yaml"
+PYTHON_BIN="${PYTHON_BIN:-python3}"
+if [[ -x "$PROJECT_ROOT/.venv/bin/python" ]]; then
+    PYTHON_BIN="$PROJECT_ROOT/.venv/bin/python"
+fi
+
+config_value() {
+    "$PYTHON_BIN" "$PROJECT_ROOT/src/config_loader.py" get --config "$CONFIG_FILE" "$1"
+}
+
+ISAAC_SIM_PATH="${ISAAC_SIM_PATH:-$(config_value paths.isaac_sim)}"
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$ISAAC_SIM_PATH/exts/isaacsim.ros2.bridge/humble/lib
 
 echo "Starting OpenArm Bimanual Teleop..."
 echo "ROS_DISTRO: $ROS_DISTRO"
+echo "ISAAC_SIM_PATH: $ISAAC_SIM_PATH"
 
-$ISAAC_SIM_PATH/python.sh $PROJECT_ROOT/src/isaac_openarm_teleop.py
+cd "$PROJECT_ROOT"
+"$ISAAC_SIM_PATH/python.sh" -m src.launch.openarm_teleop --config "$CONFIG_FILE" --robot openarm "$@"

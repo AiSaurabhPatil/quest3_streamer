@@ -134,8 +134,14 @@ paths:
 
 # Server configuration
 server:
-  websocket_port: 9090
+  host: "0.0.0.0"
+  websocket_port: 9999
   https_port: 8000
+
+# Teleoperation safety configuration
+teleop:
+  deadman_timeout_ms: 250
+  hard_timeout_ms: 1000
 ```
 
 ## Next Steps

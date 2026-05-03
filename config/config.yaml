@@ -1,21 +1,12 @@
 # Quest3 Streamer Configuration
 # All paths are relative to project root unless absolute
 
+active_robot: openarm
+
 paths:
   # Isaac Sim installation (absolute path)
   isaac_sim: "/home/saurabh/isaac_sim"
-  
-  # OpenArm robot configuration
-  openarm:
-    usd: "openarm_config/openarm_bimanual/openarm_bimanual.usd"
-    urdf: "openarm_config/openarm_bimanual_stl.urdf"
-    left_arm_config: "openarm_config/left_arm"
-    right_arm_config: "openarm_config/right_arm"
-  
-  # Panda robot configuration
-  panda:
-    usd: "environment.usd"
-  
+
   # SSL certificates
   certs:
     cert: "certs/cert.pem"
@@ -23,5 +14,63 @@ paths:
 
 # Server configuration
 server:
-  websocket_port: 9090
+  host: "0.0.0.0"
+  websocket_port: 9999
   https_port: 8000
+
+# Remote transport / VPN tuning
+transport:
+  log_interval_s: 3.0
+  enable_prediction: false
+  prediction_horizon_ms: 50
+  jitter_buffer_frames: 0
+  forward_queue_size: 64
+  forward_retry_interval_s: 2.0
+  remote_receiver:
+    host: "0.0.0.0"
+    port: 9998
+
+# Isaac Sim launcher defaults
+isaac:
+  headless: false
+  width: 1920
+  height: 1080
+  window_width: 1920
+  window_height: 1080
+  warmup_updates: 30
+  stage_stabilization_updates: 50
+  world_stabilization_updates: 20
+  post_reset_updates: 20
+  hide_ui_panels: true
+  hidden_windows:
+    - "Stage"
+    - "Layer"
+    - "Render Settings"
+    - "Content"
+    - "Content Library"
+    - "Console"
+    - "Property"
+    - "Properties"
+    - "Semantics"
+    - "Visual Scripting"
+
+# Camera capture and ROS image publishing
+cameras:
+  enabled: true
+  resolution: [480, 360]
+  publish_interval_frames: 2
+  queue_size: 3
+  log_errors: true
+  error_log_interval_s: 5.0
+
+# Teleoperation safety configuration
+teleop:
+  calibration_samples: 30
+  position_scale: [1.0, 1.0, 1.0]
+  workspace_center: [0.3, 0.0, 0.3]
+  smoothing:
+    position_alpha: 0.9
+    orientation_alpha: 0.9
+  deadman_timeout_ms: 250
+  hard_timeout_ms: 1000
+  max_target_jump_m: 0.25
