@@ -1,0 +1,15 @@
+# Lula Robot Descriptor for AC One Right Arm
+api_version: 1.0
+
+cspace:
+  - right_joint11
+  - right_joint12
+  - right_joint13
+  - right_joint14
+  - right_joint15
+  - right_joint16
+
+default_q: [0.2094, 0.4765, 0.9599, -0.5411, 0.6353, 0.3491]
+
+root_link: base_link
+end_effector: right_tcp

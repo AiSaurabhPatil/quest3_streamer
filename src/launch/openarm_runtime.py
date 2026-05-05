@@ -52,6 +52,7 @@ def run_openarm_runtime(
     recording_config: dict | None = None,
     project_root: str | None = None,
 ) -> int:
+    robot_display_name = _adapter_display_name(adapter)
     teleop_session = BimanualTeleopSession(runtime_config)
     isaac_app = IsaacApp(isaac_config)
     recording_settings = RecordingConfig.from_mapping(
@@ -84,7 +85,7 @@ def run_openarm_runtime(
         print("[Init] Creating World...")
         world = isaac_app.create_world(stage_units_in_meters=1.0)
 
-        print("[Init] Loading OpenArm robot...")
+        print(f"[Init] Loading {robot_display_name} robot...")
         try:
             adapter.load(world, world.stage)
         except RuntimeError as exc:
@@ -126,6 +127,16 @@ def run_openarm_runtime(
         ).start()
 
         if recording_settings.enabled:
+            if not camera_specs:
+                recording_cameras = dict(recording_config.get("cameras", {}) if recording_config else {})
+                recording_cameras["enabled"] = False
+                recording_settings = RecordingConfig.from_mapping(
+                    {
+                        **(recording_config or {}),
+                        "cameras": recording_cameras,
+                    },
+                    project_root=project_root or adapter.project_root,
+                )
             recording_schema = build_recording_schema(adapter, adapter.config, recording_settings)
             try:
                 recorder = LeRobotEpisodeRecorder(
@@ -215,8 +226,9 @@ def _print_ready(
     camera_manager: CameraManager,
     recording_config: RecordingConfig,
 ) -> None:
+    robot_display_name = _adapter_display_name(adapter)
     print("=" * 60)
-    print("OpenArm Bimanual Teleop Ready")
+    print(f"{robot_display_name} Bimanual Teleop Ready")
     print(f"Loaded: {adapter.usd_path}")
     print("=" * 60)
     print("Controls:")
@@ -242,6 +254,14 @@ def _print_ready(
         print("[Recording] Press Y to start each episode after your setup is ready")
     else:
         print("[Recording] Disabled")
+
+
+def _adapter_display_name(adapter: OpenArmAdapter) -> str:
+    return str(
+        adapter.config.get("display_name")
+        or adapter.config.get("robot_type")
+        or adapter.__class__.__name__.replace("Adapter", "")
+    )
 
 
 def _run_control_loop(
@@ -544,12 +564,14 @@ def _print_session_statistics(
     print(
         "  Left Arm  - IK Success: "
         f"{diagnostics.counters.get('left_ik_success', 0)}, "
-        f"IK Fail: {diagnostics.counters.get('left_ik_fail', 0)}"
+        f"IK Fail: {diagnostics.counters.get('left_ik_fail', 0)}, "
+        f"Orientation Fallback: {diagnostics.counters.get('left_orientation_fallback', 0)}"
     )
     print(
         "  Right Arm - IK Success: "
         f"{diagnostics.counters.get('right_ik_success', 0)}, "
-        f"IK Fail: {diagnostics.counters.get('right_ik_fail', 0)}"
+        f"IK Fail: {diagnostics.counters.get('right_ik_fail', 0)}, "
+        f"Orientation Fallback: {diagnostics.counters.get('right_orientation_fallback', 0)}"
     )
     print(
         "  Camera    - Published: "

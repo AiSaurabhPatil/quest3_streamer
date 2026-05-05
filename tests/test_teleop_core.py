@@ -9,7 +9,7 @@ TESTS_DIR = os.path.dirname(__file__)
 PROJECT_ROOT = os.path.join(TESTS_DIR, "..")
 sys.path.insert(0, os.path.join(PROJECT_ROOT, "src"))
 
-from robot_adapters import OpenArmAdapter, PandaAdapter  # noqa: E402
+from robot_adapters import AconeAdapter, OpenArmAdapter, PandaAdapter  # noqa: E402
 from isaac_backend import (  # noqa: E402
     CameraImagePublishers,
     CameraManager,
@@ -194,6 +194,44 @@ class SessionTests(unittest.TestCase):
         np.testing.assert_allclose(updated.targets.left_ee.orientation_wxyz, [1.0, 0.0, 0.0, 0.0])
         self.assertTrue(updated.targets.left_gripper.closed)
 
+    def test_bimanual_orientation_is_relative_to_calibration_pose(self):
+        config = TeleopSessionConfig(
+            smoothing=0.0,
+            calibration_samples=1,
+        )
+        session = BimanualTeleopSession(
+            config,
+            frame_transform=FrameTransform(np.eye(3), np.eye(3)),
+        )
+        reference_orientation = [0.0, 0.0, np.sqrt(0.5), np.sqrt(0.5)]
+        left = ControllerState(
+            hand="left",
+            receive_time_s=1.0,
+            source_timestamp=1.0,
+            pose=ControllerPose([0.0, 0.0, 0.0], reference_orientation),
+        )
+        right = ControllerState(
+            hand="right",
+            receive_time_s=1.0,
+            source_timestamp=1.0,
+            pose=ControllerPose([0.0, 0.0, 0.0], reference_orientation),
+        )
+        calibrated = session.update({"left": left, "right": right}, now_s=1.0)
+
+        self.assertTrue(calibrated.ready)
+        np.testing.assert_allclose(
+            calibrated.targets.left_ee.orientation_wxyz,
+            [1.0, 0.0, 0.0, 0.0],
+            atol=1e-7,
+        )
+
+        updated = session.update({"left": left, "right": right}, now_s=1.1)
+        np.testing.assert_allclose(
+            updated.targets.left_ee.orientation_wxyz,
+            [1.0, 0.0, 0.0, 0.0],
+            atol=1e-7,
+        )
+
     def test_session_hard_timeout_opens_gripper(self):
         config = TeleopSessionConfig(
             smoothing=0.0,
@@ -364,6 +402,143 @@ class SafetyTests(unittest.TestCase):
 
 
 class AdapterConfigTests(unittest.TestCase):
+    def test_acone_adapter_exposes_bimanual_offsets_and_gripper_settings(self):
+        adapter = AconeAdapter.from_mapping(
+            {
+                "robot_type": "acone",
+                "display_name": "AC One",
+                "usd": "assets/acone.usd",
+                "urdf": "assets/acone.urdf",
+                "left_arm_config": "acone_config/left_arm",
+                "right_arm_config": "acone_config/right_arm",
+                "left_arm": {
+                    "frame_name": "left_link6",
+                    "joints": [
+                        "left_joint1",
+                        "left_joint2",
+                        "left_joint3",
+                        "left_joint4",
+                        "left_joint5",
+                        "left_joint6",
+                    ],
+                    "preferred_config": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                    "workspace_offset": [0.0, 0.25, 0.0],
+                },
+                "right_arm": {
+                    "frame_name": "right_link16",
+                    "joints": [
+                        "right_joint11",
+                        "right_joint12",
+                        "right_joint13",
+                        "right_joint14",
+                        "right_joint15",
+                        "right_joint16",
+                    ],
+                    "preferred_config": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                    "workspace_offset": [0.0, -0.25, 0.0],
+                },
+                "grippers": {
+                    "open_position": 0.044,
+                    "closed_position": 0.0,
+                    "speed": 0.003,
+                    "threshold": 0.5,
+                    "left_joints": ["left_joint7", "left_joint8"],
+                    "right_joints": ["right_joint17", "right_joint18"],
+                },
+                "ik": {
+                    "orientation_mode": "position_only",
+                    "position_tolerance": 0.015,
+                },
+            },
+            project_root=PROJECT_ROOT,
+        )
+        self.assertTrue(adapter.usd_path.endswith("assets/acone.usd"))
+        self.assertEqual(adapter.robot_label, "AC One")
+        np.testing.assert_allclose(adapter.left_workspace_offset, [0.0, 0.25, 0.0])
+        np.testing.assert_allclose(adapter.right_workspace_offset, [0.0, -0.25, 0.0])
+        self.assertAlmostEqual(adapter.gripper_threshold, 0.5)
+        self.assertEqual(adapter.orientation_mode, "position_only")
+        self.assertIsNone(adapter._target_orientation(EndEffectorTarget()))
+
+    def test_acone_adapter_falls_back_to_position_ik_when_orientation_fails(self):
+        class FallbackSolver:
+            def __init__(self):
+                self.orientations = []
+
+            def compute_inverse_kinematics(self, **kwargs):
+                self.orientations.append(kwargs["target_orientation"])
+                if kwargs["target_orientation"] is not None:
+                    return np.zeros(6), False
+                return np.arange(6, dtype=float), True
+
+        adapter = AconeAdapter.from_mapping(
+            {
+                "robot_type": "acone",
+                "usd": "assets/acone.usd",
+                "urdf": "assets/acone.urdf",
+                "left_arm_config": "acone_config/left_arm",
+                "right_arm_config": "acone_config/right_arm",
+                "left_arm": {
+                    "frame_name": "left_link6",
+                    "joints": [
+                        "left_joint1",
+                        "left_joint2",
+                        "left_joint3",
+                        "left_joint4",
+                        "left_joint5",
+                        "left_joint6",
+                    ],
+                    "preferred_config": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                },
+                "right_arm": {
+                    "frame_name": "right_link16",
+                    "joints": [
+                        "right_joint11",
+                        "right_joint12",
+                        "right_joint13",
+                        "right_joint14",
+                        "right_joint15",
+                        "right_joint16",
+                    ],
+                    "preferred_config": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                },
+                "grippers": {
+                    "open_position": 0.044,
+                    "closed_position": 0.0,
+                    "speed": 0.003,
+                    "left_joints": ["left_joint7", "left_joint8"],
+                    "right_joints": ["right_joint17", "right_joint18"],
+                },
+                "ik": {
+                    "orientation_mode": "full_pose",
+                    "orientation_fallback_to_position": True,
+                },
+            },
+            project_root=PROJECT_ROOT,
+        )
+        solver = FallbackSolver()
+        target_positions = np.zeros(6, dtype=float)
+        adapter._apply_arm_ik(
+            solver=solver,
+            runtime=adapter.left_runtime,
+            indices=[0, 1, 2, 3, 4, 5],
+            ee_target=EndEffectorTarget(
+                position_xyz=[0.1, 0.2, 0.3],
+                orientation_wxyz=[0.0, 1.0, 0.0, 0.0],
+            ),
+            target_positions=target_positions,
+            success_key="left_ik_success",
+            fail_key="left_ik_fail",
+        )
+
+        self.assertEqual(len(solver.orientations), 2)
+        self.assertIsNone(solver.orientations[1])
+        np.testing.assert_allclose(target_positions, np.arange(6, dtype=float))
+        diagnostics = adapter.get_diagnostics()
+        self.assertEqual(diagnostics.counters["left_ik_success"], 1)
+        self.assertEqual(diagnostics.counters["left_ik_fail"], 0)
+        self.assertEqual(diagnostics.counters["left_orientation_fallback"], 1)
+
     def test_openarm_adapter_loads_yaml_without_isaac_imports(self):
         adapter = OpenArmAdapter.from_yaml(
             os.path.join(PROJECT_ROOT, "config", "robots", "openarm.yaml"),

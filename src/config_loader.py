@@ -152,6 +152,21 @@ MAIN_REQUIRED_KEYS = (
 )
 
 ROBOT_REQUIRED_KEYS = {
+    "acone": (
+        "robot_type",
+        "usd",
+        "urdf",
+        "left_arm.frame_name",
+        "left_arm.joints",
+        "left_arm.preferred_config",
+        "right_arm.frame_name",
+        "right_arm.joints",
+        "right_arm.preferred_config",
+        "grippers.open_position",
+        "grippers.closed_position",
+        "grippers.left_joints",
+        "grippers.right_joints",
+    ),
     "openarm": (
         "robot_type",
         "usd",

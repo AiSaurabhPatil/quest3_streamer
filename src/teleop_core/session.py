@@ -6,6 +6,7 @@ from typing import Mapping
 import time
 
 import numpy as np
+from scipy.spatial.transform import Rotation as R
 
 from .calibration import BimanualCalibration, CalibrationStatus, HandCalibration
 from .controller_state import ControllerState
@@ -31,6 +32,45 @@ def _as_vector(values, size: int, fallback) -> np.ndarray:
     return array.copy()
 
 
+def _normalized_quat_wxyz(values) -> np.ndarray:
+    quat = np.asarray(values, dtype=float).reshape(4)
+    norm = np.linalg.norm(quat)
+    if norm <= 1e-9 or not np.all(np.isfinite(quat)):
+        return np.array([1.0, 0.0, 0.0, 0.0], dtype=float)
+    return quat / norm
+
+
+def _rotation_from_wxyz(values) -> R:
+    quat = _normalized_quat_wxyz(values)
+    return R.from_quat([quat[1], quat[2], quat[3], quat[0]])
+
+
+def _wxyz_from_rotation(rotation: R) -> np.ndarray:
+    quat_xyzw = rotation.as_quat()
+    quat_wxyz = np.array(
+        [quat_xyzw[3], quat_xyzw[0], quat_xyzw[1], quat_xyzw[2]],
+        dtype=float,
+    )
+    if quat_wxyz[0] < 0.0:
+        quat_wxyz *= -1.0
+    return quat_wxyz
+
+
+def _relative_target_orientation(
+    *,
+    current_orientation: np.ndarray,
+    reference_orientation: np.ndarray | None,
+    home_orientation: np.ndarray,
+) -> np.ndarray:
+    if reference_orientation is None:
+        return _normalized_quat_wxyz(home_orientation)
+
+    current = _rotation_from_wxyz(current_orientation)
+    reference = _rotation_from_wxyz(reference_orientation)
+    home = _rotation_from_wxyz(home_orientation)
+    return _wxyz_from_rotation(current * reference.inv() * home)
+
+
 @dataclass
 class TeleopSessionConfig:
     pos_scale: np.ndarray = field(default_factory=lambda: np.ones(3, dtype=float))
@@ -42,6 +82,12 @@ class TeleopSessionConfig:
     )
     right_arm_offset: np.ndarray = field(
         default_factory=lambda: np.array([0.0, -0.15, 0.0], dtype=float)
+    )
+    left_arm_home_orientation: np.ndarray = field(
+        default_factory=lambda: np.array([1.0, 0.0, 0.0, 0.0], dtype=float)
+    )
+    right_arm_home_orientation: np.ndarray = field(
+        default_factory=lambda: np.array([1.0, 0.0, 0.0, 0.0], dtype=float)
     )
     smoothing: float = 0.9
     position_alpha: float | None = None
@@ -75,6 +121,20 @@ class TeleopSessionConfig:
             self.right_arm_offset,
             3,
             np.array([0.0, -0.15, 0.0], dtype=float),
+        )
+        self.left_arm_home_orientation = _normalized_quat_wxyz(
+            _as_vector(
+                self.left_arm_home_orientation,
+                4,
+                np.array([1.0, 0.0, 0.0, 0.0], dtype=float),
+            )
+        )
+        self.right_arm_home_orientation = _normalized_quat_wxyz(
+            _as_vector(
+                self.right_arm_home_orientation,
+                4,
+                np.array([1.0, 0.0, 0.0, 0.0], dtype=float),
+            )
         )
         self.smoothing = float(np.clip(self.smoothing, 0.0, 1.0))
         if self.position_alpha is None:
@@ -149,15 +209,18 @@ class _HandRuntime:
         self,
         hand: str,
         home_position: np.ndarray,
+        home_orientation: np.ndarray,
         config: TeleopSessionConfig,
         calibration: HandCalibration | None = None,
     ):
         self.hand = hand
         self.home_position = np.asarray(home_position, dtype=float).reshape(3)
+        self.home_orientation = _normalized_quat_wxyz(home_orientation)
         self.calibration = calibration or HandCalibration(config.calibration_samples)
         self.reference_position: np.ndarray | None = None
+        self.reference_orientation: np.ndarray | None = None
         self.target_pos = self.home_position.copy()
-        self.target_rot = np.array([1.0, 0.0, 0.0, 0.0], dtype=float)
+        self.target_rot = self.home_orientation.copy()
         self.smoothed_pos = self.home_position.copy()
         self.smoothed_rot = self.target_rot.copy()
         self.target_velocity_mps = np.zeros(3, dtype=float)
@@ -197,9 +260,10 @@ class _HandRuntime:
         if not preserve_calibration:
             self.calibration.reset()
             self.reference_position = None
+            self.reference_orientation = None
             self.calibrated = False
         self.target_pos = self.home_position.copy()
-        self.target_rot = np.array([1.0, 0.0, 0.0, 0.0], dtype=float)
+        self.target_rot = self.home_orientation.copy()
         self.smoothed_pos = self.home_position.copy()
         self.smoothed_rot = self.target_rot.copy()
         self.target_velocity_mps = np.zeros(3, dtype=float)
@@ -228,12 +292,14 @@ class BimanualTeleopSession:
         self.left = _HandRuntime(
             hand="left",
             home_position=config.robot_workspace_center + config.left_arm_offset,
+            home_orientation=config.left_arm_home_orientation,
             config=config,
             calibration=self.calibration.left,
         )
         self.right = _HandRuntime(
             hand="right",
             home_position=config.robot_workspace_center + config.right_arm_offset,
+            home_orientation=config.right_arm_home_orientation,
             config=config,
             calibration=self.calibration.right,
         )
@@ -304,9 +370,14 @@ class BimanualTeleopSession:
         if not runtime.calibrated:
             if runtime.calibration.add_sample(controller_state.pose.position_xyz):
                 runtime.reference_position = runtime.calibration.reference_position
+                runtime.reference_orientation = (
+                    self.frame_transform.orientation_xyzw_to_robot_wxyz(
+                        controller_state.pose.orientation_xyzw
+                    )
+                )
                 runtime.target_pos = runtime.home_position.copy()
                 runtime.smoothed_pos = runtime.home_position.copy()
-                runtime.target_rot = np.array([1.0, 0.0, 0.0, 0.0], dtype=float)
+                runtime.target_rot = runtime.home_orientation.copy()
                 runtime.smoothed_rot = runtime.target_rot.copy()
                 runtime.target_velocity_mps = np.zeros(3, dtype=float)
                 runtime.calibrated = True
@@ -333,6 +404,11 @@ class BimanualTeleopSession:
         robot_pos = robot_offset * self.config.pos_scale + runtime.home_position
         robot_rot = self.frame_transform.orientation_xyzw_to_robot_wxyz(
             controller_state.pose.orientation_xyzw
+        )
+        robot_rot = _relative_target_orientation(
+            current_orientation=robot_rot,
+            reference_orientation=runtime.reference_orientation,
+            home_orientation=runtime.home_orientation,
         )
 
         dt_s = None
@@ -540,6 +616,11 @@ class SingleArmTeleopSession(BimanualTeleopSession):
                 config.robot_workspace_center
                 if home_position is None
                 else np.asarray(home_position, dtype=float)
+            ),
+            home_orientation=(
+                config.left_arm_home_orientation
+                if self.hand == "left"
+                else config.right_arm_home_orientation
             ),
             config=config,
             calibration=self.calibration,

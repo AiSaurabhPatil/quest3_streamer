@@ -93,6 +93,14 @@ class OpenArmAdapter(RobotAdapter):
     def gripper_speed(self) -> float:
         return float(self.config["grippers"]["speed"])
 
+    @property
+    def robot_label(self) -> str:
+        return str(
+            self.config.get("display_name")
+            or self.config.get("robot_type")
+            or self.__class__.__name__.replace("Adapter", "")
+        )
+
     def load(self, world, stage):
         from omni.isaac.core.articulations import Articulation
 
@@ -106,7 +114,7 @@ class OpenArmAdapter(RobotAdapter):
         if robot_prim_path is None:
             available = [str(prim.GetPath()) for prim in stage.GetPseudoRoot().GetChildren()]
             raise RuntimeError(
-                "Could not find OpenArm robot in the USD stage. "
+                f"Could not find {self.robot_label} robot in the USD stage. "
                 f"Checked: {self.config.get('prim_search_paths', [])}. "
                 f"Available roots: {available}"
             )
@@ -115,7 +123,7 @@ class OpenArmAdapter(RobotAdapter):
         self.articulation = world.scene.add(
             Articulation(
                 prim_path=robot_prim_path,
-                name="openarm",
+                name=str(self.config.get("articulation_name", self.config.get("robot_type", "robot"))),
             )
         )
         return self.articulation

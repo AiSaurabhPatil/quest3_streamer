@@ -1,26 +1,39 @@
 from __future__ import annotations
 
 import argparse
+from copy import deepcopy
 
 from src.config_loader import default_project_root, load_runtime_config
 from src.launch.openarm_runtime import run_openarm_runtime
-from src.robot_adapters import OpenArmAdapter
+from src.robot_adapters import AconeAdapter
 from src.teleop_core import TeleopSessionConfig
 
 
 PROJECT_ROOT = default_project_root()
 
 
+def _merge_mapping(base: dict, override: dict | None) -> dict:
+    merged = deepcopy(base)
+    for key, value in (override or {}).items():
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            merged[key] = _merge_mapping(merged[key], value)
+        else:
+            merged[key] = deepcopy(value)
+    return merged
+
+
 def build_runtime_config(
-    adapter: OpenArmAdapter,
-    settings: dict,
+    adapter: AconeAdapter,
+    main_settings: dict,
+    robot_settings: dict | None = None,
     transport_settings: dict | None = None,
 ) -> TeleopSessionConfig:
+    settings = _merge_mapping(main_settings, robot_settings or {})
     smoothing = settings.get("smoothing", {})
     transport_settings = transport_settings or {}
     return TeleopSessionConfig(
         pos_scale=settings.get("position_scale", [1.0, 1.0, 1.0]),
-        robot_workspace_center=settings.get("workspace_center", [0.3, 0.0, 0.3]),
+        robot_workspace_center=settings.get("workspace_center", [0.35, 0.0, 0.30]),
         left_arm_offset=adapter.left_workspace_offset.tolist(),
         right_arm_offset=adapter.right_workspace_offset.tolist(),
         left_arm_home_orientation=adapter.config["left_arm"].get(
@@ -45,12 +58,12 @@ def build_runtime_config(
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Launch OpenArm Quest teleoperation")
+    parser = argparse.ArgumentParser(description="Launch AC One Quest teleoperation")
     parser.add_argument("--config", dest="config_path", help="Path to the main YAML config file")
     parser.add_argument(
         "--robot",
-        default="openarm",
-        help="Robot config to load; OpenArm launcher expects 'openarm'",
+        default="acone",
+        help="Robot config to load; AC One launcher expects 'acone'",
     )
     parser.add_argument(
         "--headless",
@@ -98,8 +111,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
 
 def resolve_runtime_settings(args: argparse.Namespace) -> tuple[object, dict, dict, bool, dict]:
-    if args.robot != "openarm":
-        raise ValueError(f"OpenArm launcher only supports --robot openarm, got '{args.robot}'")
+    if args.robot != "acone":
+        raise ValueError(f"AC One launcher only supports --robot acone, got '{args.robot}'")
 
     runtime = load_runtime_config(
         config_path=args.config_path,
@@ -117,9 +130,16 @@ def resolve_runtime_settings(args: argparse.Namespace) -> tuple[object, dict, di
     if args.disable_cameras:
         camera_config["enabled"] = False
 
-    teleop_config = dict(runtime.main.get("teleop", {}))
+    teleop_config = _merge_mapping(
+        dict(runtime.main.get("teleop", {})),
+        dict(runtime.robot.get("teleop", {})),
+    )
     debug_ik = bool(args.debug_ik or teleop_config.get("debug_ik", False))
     recording_config = dict(runtime.main.get("recording", {}))
+    if recording_config.get("repo_id") == "local/quest3-openarm":
+        recording_config["repo_id"] = "local/quest3-acone"
+    if recording_config.get("task") == "Teleoperate OpenArm to complete the task":
+        recording_config["task"] = "Teleoperate AC One to complete the task"
     if args.record:
         recording_config["enabled"] = True
     if args.dataset_root:
@@ -148,10 +168,11 @@ def main(argv: list[str] | None = None) -> int:
     args = build_arg_parser().parse_args(argv)
     runtime, isaac_config, camera_config, debug_ik, recording_config = resolve_runtime_settings(args)
 
-    adapter = OpenArmAdapter.from_mapping(runtime.robot, project_root=PROJECT_ROOT)
+    adapter = AconeAdapter.from_mapping(runtime.robot, project_root=PROJECT_ROOT)
     runtime_config = build_runtime_config(
         adapter,
-        runtime.main.get("teleop", {}),
+        dict(runtime.main.get("teleop", {})),
+        dict(runtime.robot.get("teleop", {})),
         runtime.main.get("transport", {}),
     )
     return run_openarm_runtime(
