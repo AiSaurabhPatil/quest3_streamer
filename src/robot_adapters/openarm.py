@@ -55,6 +55,8 @@ class OpenArmAdapter(RobotAdapter):
                 "left_ik_fail": 0,
                 "right_ik_success": 0,
                 "right_ik_fail": 0,
+                "left_ik_step_limited": 0,
+                "right_ik_step_limited": 0,
             }
         )
 
@@ -358,6 +360,11 @@ class OpenArmAdapter(RobotAdapter):
         if success:
             self._diagnostics.counters[success_key] += 1
             arm_positions = np.asarray(actions, dtype=float).reshape(-1)[: len(indices)]
+            arm_positions = self._limit_arm_step(
+                runtime=runtime,
+                arm_positions=arm_positions,
+                limit_key=success_key.replace("_ik_success", "_ik_step_limited"),
+            )
             runtime.last_arm_positions = arm_positions.copy()
             for offset, joint_index in enumerate(indices):
                 if offset < arm_positions.size:
@@ -370,6 +377,40 @@ class OpenArmAdapter(RobotAdapter):
         for offset, joint_index in enumerate(indices):
             if offset < runtime.last_arm_positions.size:
                 target_positions[joint_index] = runtime.last_arm_positions[offset]
+
+    @property
+    def max_ik_joint_step_rad(self) -> float | None:
+        value = self.config.get("safety", {}).get(
+            "max_ik_joint_step_rad",
+            self.config.get("ik", {}).get("max_ik_joint_step_rad", 0.04),
+        )
+        if value is None:
+            return None
+        return max(0.0, float(value))
+
+    def _limit_arm_step(
+        self,
+        *,
+        runtime: _ArmRuntime,
+        arm_positions: np.ndarray,
+        limit_key: str,
+    ) -> np.ndarray:
+        max_step = self.max_ik_joint_step_rad
+        if max_step is None or max_step <= 0.0 or runtime.last_arm_positions is None:
+            return arm_positions.copy()
+
+        previous = np.asarray(runtime.last_arm_positions, dtype=float).reshape(-1)
+        candidate = np.asarray(arm_positions, dtype=float).reshape(-1)
+        if previous.size != candidate.size:
+            return candidate.copy()
+
+        delta = candidate - previous
+        limited_delta = np.clip(delta, -max_step, max_step)
+        if np.any(np.abs(delta - limited_delta) > 1e-9):
+            self._diagnostics.counters[limit_key] = (
+                self._diagnostics.counters.get(limit_key, 0) + 1
+            )
+        return previous + limited_delta
 
     def _step_gripper(self, current: float, closed: bool) -> float:
         open_position = float(self.config["grippers"]["open_position"])

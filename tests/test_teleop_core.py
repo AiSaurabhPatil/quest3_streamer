@@ -347,6 +347,7 @@ class SessionTests(unittest.TestCase):
             calibration_samples=1,
             enable_prediction=True,
             prediction_horizon_s=0.05,
+            max_target_velocity_mps=None,
         )
         session = SingleArmTeleopSession(
             config,
@@ -384,6 +385,108 @@ class SessionTests(unittest.TestCase):
 
         np.testing.assert_allclose(updated.targets.ee_target.position_xyz, [0.75, 0.0, 0.4])
         self.assertEqual(updated.hand_state.sequence, 3)
+
+    def test_fresh_pose_after_soft_stale_gap_is_blended(self):
+        config = TeleopSessionConfig(
+            robot_workspace_center=[0.5, 0.0, 0.4],
+            smoothing=0.0,
+            calibration_samples=1,
+            deadman_timeout_s=0.25,
+            hard_timeout_s=1.0,
+            stale_recovery_alpha=0.25,
+            max_target_velocity_mps=None,
+        )
+        session = SingleArmTeleopSession(
+            config,
+            hand="right",
+            frame_transform=FrameTransform(np.eye(3), np.eye(3)),
+        )
+
+        first = ControllerState(
+            hand="right",
+            sequence=1,
+            receive_time_s=1.0,
+            source_timestamp=1.0,
+            pose=ControllerPose([1.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0]),
+        )
+        session.update(first, now_s=1.0)
+
+        second = ControllerState(
+            hand="right",
+            sequence=2,
+            receive_time_s=1.1,
+            source_timestamp=1.1,
+            pose=ControllerPose([1.1, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0]),
+        )
+        session.update(second, now_s=1.1)
+
+        third = ControllerState(
+            hand="right",
+            sequence=3,
+            receive_time_s=1.2,
+            source_timestamp=1.2,
+            pose=ControllerPose([1.2, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0]),
+        )
+        session.update(third, now_s=1.2)
+
+        stale = session.update(third, now_s=1.5)
+
+        self.assertTrue(stale.hand_state.stale)
+        self.assertFalse(stale.hand_state.hard_timeout_active)
+
+        fourth = ControllerState(
+            hand="right",
+            sequence=4,
+            receive_time_s=1.5,
+            source_timestamp=1.5,
+            pose=ControllerPose([1.5, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0]),
+        )
+        recovered = session.update(fourth, now_s=1.5)
+
+        self.assertFalse(recovered.hand_state.stale)
+        np.testing.assert_allclose(recovered.targets.ee_target.position_xyz, [0.775, 0.0, 0.4])
+
+    def test_target_velocity_limit_slows_large_controller_motion(self):
+        config = TeleopSessionConfig(
+            robot_workspace_center=[0.5, 0.0, 0.4],
+            smoothing=0.0,
+            calibration_samples=1,
+            max_target_velocity_mps=0.2,
+        )
+        session = SingleArmTeleopSession(
+            config,
+            hand="right",
+            frame_transform=FrameTransform(np.eye(3), np.eye(3)),
+        )
+
+        first = ControllerState(
+            hand="right",
+            sequence=1,
+            receive_time_s=1.0,
+            source_timestamp=1.0,
+            pose=ControllerPose([0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0]),
+        )
+        session.update(first, now_s=1.0)
+
+        second = ControllerState(
+            hand="right",
+            sequence=2,
+            receive_time_s=1.1,
+            source_timestamp=1.1,
+            pose=ControllerPose([1.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0]),
+        )
+        session.update(second, now_s=1.1)
+
+        third = ControllerState(
+            hand="right",
+            sequence=3,
+            receive_time_s=1.2,
+            source_timestamp=1.2,
+            pose=ControllerPose([2.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0]),
+        )
+        limited = session.update(third, now_s=1.2)
+
+        np.testing.assert_allclose(limited.targets.ee_target.position_xyz, [1.52, 0.0, 0.4])
 
 
 class SafetyTests(unittest.TestCase):
@@ -538,6 +641,46 @@ class AdapterConfigTests(unittest.TestCase):
         self.assertEqual(diagnostics.counters["left_ik_success"], 1)
         self.assertEqual(diagnostics.counters["left_ik_fail"], 0)
         self.assertEqual(diagnostics.counters["left_orientation_fallback"], 1)
+
+    def test_openarm_adapter_limits_large_ik_joint_steps(self):
+        adapter = OpenArmAdapter.from_mapping(
+            {
+                "robot_type": "openarm",
+                "usd": "assets/openarm.usd",
+                "urdf": "assets/openarm.urdf",
+                "left_arm_config": "openarm_config/left_arm",
+                "right_arm_config": "openarm_config/right_arm",
+                "left_arm": {
+                    "frame_name": "left_hand",
+                    "joints": ["left_joint1", "left_joint2", "left_joint3"],
+                    "preferred_config": [0.0, 0.0, 0.0],
+                },
+                "right_arm": {
+                    "frame_name": "right_hand",
+                    "joints": ["right_joint1", "right_joint2", "right_joint3"],
+                    "preferred_config": [0.0, 0.0, 0.0],
+                },
+                "grippers": {
+                    "open_position": 0.044,
+                    "closed_position": 0.0,
+                    "speed": 0.003,
+                    "left_joints": ["left_finger1"],
+                    "right_joints": ["right_finger1"],
+                },
+                "ik": {"max_ik_joint_step_rad": 0.05},
+            },
+            project_root=PROJECT_ROOT,
+        )
+        adapter.left_runtime.last_arm_positions = np.zeros(3, dtype=float)
+
+        limited = adapter._limit_arm_step(
+            runtime=adapter.left_runtime,
+            arm_positions=np.array([1.0, -1.0, 0.02]),
+            limit_key="left_ik_step_limited",
+        )
+
+        np.testing.assert_allclose(limited, [0.05, -0.05, 0.02])
+        self.assertEqual(adapter.get_diagnostics().counters["left_ik_step_limited"], 1)
 
     def test_openarm_adapter_loads_yaml_without_isaac_imports(self):
         adapter = OpenArmAdapter.from_yaml(

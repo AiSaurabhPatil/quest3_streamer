@@ -137,6 +137,12 @@ def run_openarm_runtime(
                     },
                     project_root=project_root or adapter.project_root,
                 )
+            recording_settings = _align_recording_camera_resolution(
+                recording_config=recording_config,
+                recording_settings=recording_settings,
+                camera_config=camera_config,
+                project_root=project_root or adapter.project_root,
+            )
             recording_schema = build_recording_schema(adapter, adapter.config, recording_settings)
             try:
                 recorder = LeRobotEpisodeRecorder(
@@ -191,6 +197,39 @@ def _cleanup_resource(label: str, cleanup) -> None:
 
 def _is_known_ros_destroy_node_cleanup_error(exc: Exception) -> bool:
     return isinstance(exc, ValueError) and str(exc) == "list.remove(x): x not in list"
+
+
+def _align_recording_camera_resolution(
+    *,
+    recording_config: dict | None,
+    recording_settings: RecordingConfig,
+    camera_config: dict,
+    project_root: str,
+) -> RecordingConfig:
+    if not recording_settings.cameras.enabled or not camera_config.get("enabled", True):
+        return recording_settings
+
+    resolution = camera_config.get("resolution")
+    if not resolution:
+        return recording_settings
+
+    capture_resolution = (int(resolution[0]), int(resolution[1]))
+    if capture_resolution == recording_settings.cameras.resolution:
+        return recording_settings
+
+    recording_cameras = dict((recording_config or {}).get("cameras", {}))
+    recording_cameras["resolution"] = list(capture_resolution)
+    print(
+        "[Recording] Aligning camera feature resolution with capture resolution: "
+        f"{capture_resolution[0]}x{capture_resolution[1]}"
+    )
+    return RecordingConfig.from_mapping(
+        {
+            **(recording_config or {}),
+            "cameras": recording_cameras,
+        },
+        project_root=project_root,
+    )
 
 
 def _initialize_ik(adapter: OpenArmAdapter) -> bool:

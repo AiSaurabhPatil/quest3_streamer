@@ -48,9 +48,10 @@ def build_runtime_config(
         orientation_alpha=smoothing.get("orientation_alpha", 0.9),
         gripper_threshold=adapter.gripper_threshold,
         calibration_samples=settings.get("calibration_samples", 30),
-        deadman_timeout_s=settings.get("deadman_timeout_ms", 250) / 1000.0,
+        deadman_timeout_s=settings.get("deadman_timeout_ms", 500) / 1000.0,
         hard_timeout_s=settings.get("hard_timeout_ms", 1000) / 1000.0,
         max_target_jump_m=settings.get("max_target_jump_m"),
+        max_target_velocity_mps=settings.get("max_target_velocity_mps", 0.4),
         enable_prediction=bool(transport_settings.get("enable_prediction", False)),
         prediction_horizon_s=transport_settings.get("prediction_horizon_ms", 50) / 1000.0,
         jitter_buffer_frames=transport_settings.get("jitter_buffer_frames", 0),
@@ -140,6 +141,10 @@ def resolve_runtime_settings(args: argparse.Namespace) -> tuple[object, dict, di
         recording_config["repo_id"] = "local/quest3-acone"
     if recording_config.get("task") == "Teleoperate OpenArm to complete the task":
         recording_config["task"] = "Teleoperate AC One to complete the task"
+    recording_cameras = dict(recording_config.get("cameras", {}))
+    if tuple(recording_cameras.get("include", ())) == ("head", "wrist_left", "wrist_right"):
+        recording_cameras["include"] = list(runtime.robot.get("cameras", {}).keys())
+        recording_config["cameras"] = recording_cameras
     if args.record:
         recording_config["enabled"] = True
     if args.dataset_root:

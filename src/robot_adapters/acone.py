@@ -30,6 +30,10 @@ class AconeAdapter(OpenArmAdapter):
             }
         )
 
+    def initialize_joint_mappings(self) -> None:
+        super().initialize_joint_mappings()
+        self._apply_gripper_drive_overrides()
+
     def _apply_arm_ik(
         self,
         solver,
@@ -73,6 +77,11 @@ class AconeAdapter(OpenArmAdapter):
         if success:
             self._diagnostics.counters[success_key] += 1
             arm_positions = np.asarray(actions, dtype=float).reshape(-1)[: len(indices)]
+            arm_positions = self._limit_arm_step(
+                runtime=runtime,
+                arm_positions=arm_positions,
+                limit_key=success_key.replace("_ik_success", "_ik_step_limited"),
+            )
             runtime.last_arm_positions = arm_positions.copy()
             for offset, joint_index in enumerate(indices):
                 if offset < arm_positions.size:
@@ -100,6 +109,32 @@ class AconeAdapter(OpenArmAdapter):
         if self.orientation_mode in {"position_only", "position-only", "none"}:
             return None
         return ee_target.orientation_wxyz
+
+    def _apply_gripper_drive_overrides(self) -> None:
+        drive_config = self.config.get("grippers", {}).get("drive", {})
+        if not drive_config or self.articulation is None:
+            return
+
+        try:
+            from pxr import UsdPhysics
+        except Exception as exc:
+            self._diagnostics.details["gripper_drive_error"] = str(exc)
+            return
+
+        stage = self.articulation.prim.GetStage()
+        gripper_joints = set(self.config["grippers"]["left_joints"]) | set(
+            self.config["grippers"]["right_joints"]
+        )
+        for prim in stage.Traverse():
+            if prim.GetName() not in gripper_joints:
+                continue
+            drive = UsdPhysics.DriveAPI.Apply(prim, "linear")
+            if "stiffness" in drive_config:
+                drive.CreateStiffnessAttr(float(drive_config["stiffness"]))
+            if "damping" in drive_config:
+                drive.CreateDampingAttr(float(drive_config["damping"]))
+            if "max_force" in drive_config:
+                drive.CreateMaxForceAttr(float(drive_config["max_force"]))
 
 
 def _optional_float(value) -> float | None:

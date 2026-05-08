@@ -1,14 +1,14 @@
 robot_type: acone
 display_name: "AC One"
 articulation_name: "acone"
-usd: "/home/saurabh/Development/ARX_Model/AC one/URDF/AC one/acone/urdf/acone/acone.usd"
+usd: "/home/saurabh/Development/ARX_Model/AC one/acone_scene.usd"
 urdf: "acone_config/urdf/acone_with_tcp.urdf"
 left_arm_config: "acone_config/left_arm"
 right_arm_config: "acone_config/right_arm"
 
 prim_search_paths:
   - "/acone"
-  - "/World/acone"
+  - "/World/ACone"
   - "/World/Robot"
   - "/Robot"
 
@@ -39,9 +39,9 @@ right_arm:
   home_orientation: [1.0, 0.0, 0.0, 0.0]
 
 grippers:
-  open_position: 0.044
+  open_position: 0.06
   closed_position: 0.0
-  speed: 0.003
+  speed: 1
   threshold: 0.5
   left_joints:
     - "left_joint7"
@@ -49,6 +49,17 @@ grippers:
   right_joints:
     - "right_joint17"
     - "right_joint18"
+
+cameras:
+  head_camera:
+    prim_path: "/World/ACone/base_link/head_camera"
+    topic: "/camera/head_camera/image_raw"
+  left_wrist_camera:
+    prim_path: "/World/ACone/left_link6/left_wrist_camera"
+    topic: "/camera/left_wrist_camera/image_raw"
+  right_wrist_camera:
+    prim_path: "/World/ACone/right_link16/right_wrist_camera"
+    topic: "/camera/right_wrist_camera/image_raw"
 
 ik:
   orientation_mode: "full_pose"
@@ -60,9 +71,10 @@ teleop:
   workspace_center: [0.2097, 0.0186, 0.2620]
   position_scale: [1.0, 1.0, 1.0]
   calibration_samples: 30
-  deadman_timeout_ms: 250
+  deadman_timeout_ms: 500
   hard_timeout_ms: 1000
   max_target_jump_m: 0.25
+  max_target_velocity_mps: 0.4
 
 recording:
   robot_type: acone

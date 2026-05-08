@@ -56,9 +56,10 @@ DEFAULT_MAIN_CONFIG = {
             "position_alpha": 0.9,
             "orientation_alpha": 0.9,
         },
-        "deadman_timeout_ms": 250,
+        "deadman_timeout_ms": 500,
         "hard_timeout_ms": 1000,
         "max_target_jump_m": 0.25,
+        "max_target_velocity_mps": 0.4,
     },
     "transport": {
         "log_interval_s": 3.0,

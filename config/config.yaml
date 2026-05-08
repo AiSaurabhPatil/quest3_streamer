@@ -57,8 +57,8 @@ isaac:
 # Camera capture and ROS image publishing
 cameras:
   enabled: true
-  resolution: [480, 360]
-  publish_interval_frames: 2
+  resolution: [320, 240]
+  publish_interval_frames: 4
   queue_size: 3
   log_errors: true
   error_log_interval_s: 5.0
@@ -85,6 +85,7 @@ teleop:
   smoothing:
     position_alpha: 0.9
     orientation_alpha: 0.9
-  deadman_timeout_ms: 250
+  deadman_timeout_ms: 500
   hard_timeout_ms: 1000
   max_target_jump_m: 0.25
+  max_target_velocity_mps: 0.4

@@ -10,9 +10,13 @@ if PROJECT_ROOT not in sys.path:
 
 from src.launch.openarm_teleop import build_arg_parser as build_openarm_parser  # noqa: E402
 from src.launch.openarm_teleop import resolve_runtime_settings as resolve_openarm_settings  # noqa: E402
+from src.launch.acone_teleop import build_arg_parser as build_acone_parser  # noqa: E402
+from src.launch.acone_teleop import resolve_runtime_settings as resolve_acone_settings  # noqa: E402
+from src.launch.openarm_runtime import _align_recording_camera_resolution  # noqa: E402
 from src.launch.panda_teleop import build_arg_parser as build_panda_parser  # noqa: E402
 from src.launch.panda_teleop import resolve_runtime_settings as resolve_panda_settings  # noqa: E402
 from src.launch.webxr_bridge import build_arg_parser as build_bridge_parser  # noqa: E402
+from src.recording import RecordingConfig  # noqa: E402
 
 
 class LaunchPhase9Tests(unittest.TestCase):
@@ -58,6 +62,36 @@ class LaunchPhase9Tests(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             resolve_openarm_settings(args)
+
+    def test_acone_recording_uses_acone_camera_names(self):
+        parser = build_acone_parser()
+        args = parser.parse_args(["--record"])
+
+        runtime, _, _, _, recording_config = resolve_acone_settings(args)
+
+        self.assertEqual(runtime.robot_name, "acone")
+        self.assertTrue(recording_config["enabled"])
+        self.assertEqual(recording_config["repo_id"], "local/quest3-acone")
+        self.assertEqual(
+            recording_config["cameras"]["include"],
+            ["head_camera", "left_wrist_camera", "right_wrist_camera"],
+        )
+
+    def test_recording_camera_resolution_tracks_capture_resolution(self):
+        recording_map = {
+            "enabled": True,
+            "cameras": {"enabled": True, "resolution": [480, 360]},
+        }
+        recording = RecordingConfig.from_mapping(recording_map, project_root=PROJECT_ROOT)
+
+        aligned = _align_recording_camera_resolution(
+            recording_config=recording_map,
+            recording_settings=recording,
+            camera_config={"enabled": True, "resolution": [320, 240]},
+            project_root=PROJECT_ROOT,
+        )
+
+        self.assertEqual(aligned.cameras.resolution, (320, 240))
 
     def test_panda_cli_overrides_headless_and_disable_cameras(self):
         parser = build_panda_parser()

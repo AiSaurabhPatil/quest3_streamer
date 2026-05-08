@@ -10,7 +10,7 @@ from scipy.spatial.transform import Rotation as R
 
 from .calibration import BimanualCalibration, CalibrationStatus, HandCalibration
 from .controller_state import ControllerState
-from .filters import OrientationSlerp, PositionEMA
+from .filters import OrientationSlerp, PositionEMA, slerp_quat_wxyz
 from .frame_transforms import (
     DEFAULT_TOOL_ROTATION_CORRECTION,
     DEFAULT_VR_TO_ROBOT,
@@ -94,13 +94,15 @@ class TeleopSessionConfig:
     orientation_alpha: float | None = None
     gripper_threshold: float = 0.5
     calibration_samples: int = 30
-    deadman_timeout_s: float = 0.25
+    deadman_timeout_s: float = 0.5
     hard_timeout_s: float = 1.0
     max_target_jump_m: float | None = None
+    max_target_velocity_mps: float | None = 0.4
     workspace_bounds: WorkspaceBounds | None = None
     enable_prediction: bool = False
     prediction_horizon_s: float = 0.05
     jitter_buffer_frames: int = 0
+    stale_recovery_alpha: float = 0.25
 
     def __post_init__(self):
         if np.isscalar(self.pos_scale):
@@ -149,9 +151,12 @@ class TeleopSessionConfig:
         self.hard_timeout_s = max(self.deadman_timeout_s, float(self.hard_timeout_s))
         if self.max_target_jump_m is not None:
             self.max_target_jump_m = max(0.0, float(self.max_target_jump_m))
+        if self.max_target_velocity_mps is not None:
+            self.max_target_velocity_mps = max(0.0, float(self.max_target_velocity_mps))
         self.enable_prediction = bool(self.enable_prediction)
         self.prediction_horizon_s = max(0.0, float(self.prediction_horizon_s))
         self.jitter_buffer_frames = max(0, int(self.jitter_buffer_frames))
+        self.stale_recovery_alpha = float(np.clip(self.stale_recovery_alpha, 0.0, 1.0))
 
     @classmethod
     def from_dict(cls, values: Mapping[str, object]) -> "TeleopSessionConfig":
@@ -230,6 +235,7 @@ class _HandRuntime:
         self.last_processed_pose_marker: tuple[int, float, float] | None = None
         self.last_target_update_s: float | None = None
         self.last_stale_report_s = 0.0
+        self.soft_stale_active = False
         self.hard_timeout_active = False
         self.position_filter = (
             PositionEMA(config.position_alpha) if config.position_alpha > 0.0 else None
@@ -243,6 +249,7 @@ class _HandRuntime:
             TargetSafetyConfig(
                 stale_timeout_s=config.deadman_timeout_s,
                 max_translation_step_m=config.max_target_jump_m,
+                max_velocity_mps=config.max_target_velocity_mps,
                 workspace_bounds=config.workspace_bounds,
             )
         )
@@ -271,6 +278,7 @@ class _HandRuntime:
         self.last_processed_pose_marker = None
         self.last_target_update_s = None
         self.last_stale_report_s = 0.0
+        self.soft_stale_active = False
         self.hard_timeout_active = False
         self.pending_states.clear()
         self.reset_filters()
@@ -415,6 +423,16 @@ class BimanualTeleopSession:
         if runtime.last_target_update_s is not None:
             dt_s = controller_state.receive_time_s - runtime.last_target_update_s
 
+        recovering_from_stale = (
+            runtime.soft_stale_active
+            and dt_s is not None
+            and dt_s > self.config.deadman_timeout_s
+        )
+        if recovering_from_stale and self.config.stale_recovery_alpha < 1.0:
+            alpha = self.config.stale_recovery_alpha
+            robot_pos = runtime.target_pos + (robot_pos - runtime.target_pos) * alpha
+            robot_rot = slerp_quat_wxyz(runtime.target_rot, robot_rot, alpha)
+
         safe_pos, accepted = runtime.safety.apply_position(
             robot_pos,
             previous_xyz=runtime.target_pos,
@@ -439,6 +457,7 @@ class BimanualTeleopSession:
 
         age_s = runtime.last_controller_state.age_s(now_s)
         if age_s <= self.config.deadman_timeout_s:
+            runtime.soft_stale_active = False
             if runtime.hard_timeout_active:
                 runtime.hard_timeout_active = False
                 events.append(
@@ -457,11 +476,12 @@ class BimanualTeleopSession:
                     hand=runtime.hand,
                     message=(
                         f"{runtime.hand.upper()} controller stale for {age_s * 1000.0:.0f} ms; "
-                        "holding last valid IK target"
+                        "holding current IK target; next fresh pose will be blended"
                     ),
                 )
             )
             runtime.last_stale_report_s = now_s
+        runtime.soft_stale_active = True
 
         if age_s > self.config.hard_timeout_s and not runtime.hard_timeout_active:
             runtime.hard_timeout_active = True
@@ -495,6 +515,7 @@ class BimanualTeleopSession:
             or runtime.last_target_update_s is None
             or runtime.last_controller_state is None
             or runtime.hard_timeout_active
+            or runtime.soft_stale_active
             or runtime.last_controller_state.age_s(now_s) > self.config.deadman_timeout_s
         ):
             return runtime.target_pos.copy()
