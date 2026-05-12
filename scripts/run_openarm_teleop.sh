@@ -48,7 +48,16 @@ PY
 }
 
 ensure_lerobot_available_to_recording_python() {
-    local recording_python="${LEROBOT_RECORDING_PYTHON:-$PROJECT_ROOT/.venv/bin/python}"
+    local recording_python="${LEROBOT_RECORDING_PYTHON:-}"
+    if [[ -z "$recording_python" ]]; then
+        local dataset_format
+        dataset_format=$(config_value recording.dataset_format 2>/dev/null || echo auto)
+        if [[ "$dataset_format" == "v2.1" && -x "$PROJECT_ROOT/.venv-lerobot-v21/bin/python" ]]; then
+            recording_python="$PROJECT_ROOT/.venv-lerobot-v21/bin/python"
+        else
+            recording_python="$PROJECT_ROOT/.venv/bin/python"
+        fi
+    fi
     if [[ ! -x "$recording_python" ]]; then
         echo "[Recording] LeRobot worker Python was not found or is not executable:"
         echo "  $recording_python"
@@ -57,7 +66,10 @@ ensure_lerobot_available_to_recording_python() {
     fi
 
     if "$recording_python" - <<'PY' >/dev/null
-from lerobot.datasets.lerobot_dataset import LeRobotDataset
+try:
+    from lerobot.common.datasets.lerobot_dataset import LeRobotDataset
+except ImportError:
+    from lerobot.datasets.lerobot_dataset import LeRobotDataset
 PY
     then
         echo "[Recording] LeRobot writer will run outside Isaac Sim using:"
@@ -68,7 +80,8 @@ PY
     echo "[Recording] LeRobot is not importable in the recording worker Python:"
     python_version_line "$recording_python"
     echo "[Recording] Install LeRobot in that environment, not in Isaac Sim's Python:"
-    echo "  \"$recording_python\" -m pip install \"lerobot>=0.4.0\""
+    echo "  \"$recording_python\" -m pip install \"lerobot==0.3.2\"  # dataset v2.1"
+    echo "  \"$recording_python\" -m pip install \"lerobot>=0.4.0\"  # dataset v3.0"
     return 1
 }
 

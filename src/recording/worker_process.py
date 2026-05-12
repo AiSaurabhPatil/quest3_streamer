@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import asdict
+import inspect
+import json
 from pathlib import Path
+import shutil
 import sys
 import traceback
 
@@ -57,18 +60,16 @@ class LeRobotWorkerProcess:
         self._schema = message["schema"]
         robot_type = str(message["robot_type"])
 
-        try:
-            from lerobot.datasets.lerobot_dataset import LeRobotDataset
-        except ImportError as exc:
-            raise RuntimeError(
-                "LeRobot is not installed in the recording worker Python environment "
-                f"({sys.executable}). Install 'lerobot' there or set LEROBOT_RECORDING_PYTHON."
-            ) from exc
+        compat = LeRobotDatasetCompat.load(self._config.dataset_format)
 
         dataset_root = Path(self._config.root) / self._config.repo_id
         if dataset_root.exists():
-            _validate_existing_dataset_root(dataset_root)
-            self._dataset = LeRobotDataset(
+            if _is_empty_v21_dataset_root(dataset_root, compat.dataset_format):
+                shutil.rmtree(dataset_root)
+                self._dataset = self._create_dataset(compat, dataset_root, robot_type)
+                return
+            _validate_existing_dataset_root(dataset_root, expected_format=compat.dataset_format)
+            self._dataset = compat.open_dataset(
                 repo_id=self._config.repo_id,
                 root=dataset_root,
                 streaming_encoding=self._config.streaming_encoding,
@@ -77,10 +78,10 @@ class LeRobotWorkerProcess:
             )
             return
 
-        self._dataset = self._create_dataset(LeRobotDataset, dataset_root, robot_type)
+        self._dataset = self._create_dataset(compat, dataset_root, robot_type)
 
-    def _create_dataset(self, LeRobotDataset, dataset_root: Path, robot_type: str):
-        return LeRobotDataset.create(
+    def _create_dataset(self, compat, dataset_root: Path, robot_type: str):
+        return compat.create_dataset(
             repo_id=self._config.repo_id,
             root=dataset_root,
             fps=self._config.fps,
@@ -115,7 +116,13 @@ class LeRobotWorkerProcess:
         raise ValueError(f"Unknown recorder worker message type: {message_type}")
 
     def _add_frame(self, snapshot: RecordingFrameSnapshot) -> None:
-        self._dataset.add_frame(self._frame_to_payload(snapshot))
+        payload = self._frame_to_payload(snapshot)
+        task = str(payload.pop("task", ""))
+        try:
+            self._dataset.add_frame(payload, task=task)
+        except TypeError:
+            payload["task"] = task
+            self._dataset.add_frame(payload)
         self._buffered_frame_count += 1
         self.diagnostics.frames_enqueued += 1
         self.diagnostics.frames_written += 1
@@ -132,7 +139,10 @@ class LeRobotWorkerProcess:
         self.diagnostics.saved_episodes += 1
 
     def _discard_episode(self) -> None:
-        self._dataset.clear_episode_buffer(delete_images=True)
+        try:
+            self._dataset.clear_episode_buffer(delete_images=True)
+        except TypeError:
+            self._dataset.clear_episode_buffer()
         self._buffered_frame_count = 0
         self.diagnostics.discarded_episodes += 1
 
@@ -141,7 +151,8 @@ class LeRobotWorkerProcess:
             self._save_episode()
         elif self._buffered_frame_count > 0:
             self._discard_episode()
-        self._dataset.finalize()
+        if hasattr(self._dataset, "finalize"):
+            self._dataset.finalize()
         if self._config.push_to_hub_on_shutdown:
             self._dataset.push_to_hub(private=self._config.private_hub_repo)
 
@@ -187,13 +198,65 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _validate_existing_dataset_root(dataset_root: Path) -> None:
-    required_paths = (
-        dataset_root / "meta" / "info.json",
-        dataset_root / "meta" / "tasks.parquet",
-        dataset_root / "meta" / "episodes",
-        dataset_root / "data",
-    )
+class LeRobotDatasetCompat:
+    def __init__(self, dataset_cls, *, codebase_version: str):
+        self.dataset_cls = dataset_cls
+        self.codebase_version = codebase_version
+
+    @property
+    def dataset_format(self) -> str:
+        return "v2.1" if self.codebase_version.startswith("v2.") else "v3.0"
+
+    @classmethod
+    def load(cls, requested_format: str):
+        try:
+            try:
+                import lerobot.common.datasets.lerobot_dataset as dataset_module
+            except ImportError:
+                import lerobot.datasets.lerobot_dataset as dataset_module
+        except ImportError as exc:
+            raise RuntimeError(
+                "LeRobot is not installed in the recording worker Python environment "
+                f"({sys.executable}). Install 'lerobot' there or set LEROBOT_RECORDING_PYTHON."
+            ) from exc
+
+        compat = cls(
+            dataset_module.LeRobotDataset,
+            codebase_version=str(getattr(dataset_module, "CODEBASE_VERSION", "unknown")),
+        )
+        if requested_format != "auto" and compat.dataset_format != requested_format:
+            raise RuntimeError(
+                "Recording dataset_format="
+                f"{requested_format} requires a LeRobot worker that writes {requested_format}, "
+                f"but {sys.executable} provides {compat.codebase_version}. "
+                "Set LEROBOT_RECORDING_PYTHON to a matching environment."
+            )
+        return compat
+
+    def open_dataset(self, **kwargs):
+        return self.dataset_cls(**_supported_kwargs(self.dataset_cls, kwargs))
+
+    def create_dataset(self, **kwargs):
+        create = self.dataset_cls.create
+        return create(**_supported_kwargs(create, kwargs))
+
+
+def _supported_kwargs(callable_obj, kwargs: dict) -> dict:
+    signature = inspect.signature(callable_obj)
+    if any(param.kind == inspect.Parameter.VAR_KEYWORD for param in signature.parameters.values()):
+        return kwargs
+    return {key: value for key, value in kwargs.items() if key in signature.parameters}
+
+
+def _validate_existing_dataset_root(dataset_root: Path, *, expected_format: str = "auto") -> None:
+    dataset_format = _read_dataset_format(dataset_root)
+    if expected_format != "auto" and dataset_format != "unknown" and dataset_format != expected_format:
+        raise RuntimeError(
+            f"Dataset path already exists with format {dataset_format}: {dataset_root}. "
+            f"The selected LeRobot worker expects {expected_format}."
+        )
+
+    required_paths = _required_dataset_paths(dataset_root, dataset_format if dataset_format != "unknown" else expected_format)
     missing_paths = [path for path in required_paths if not path.exists()]
     if not missing_paths:
         return
@@ -202,6 +265,52 @@ def _validate_existing_dataset_root(dataset_root: Path) -> None:
     raise RuntimeError(
         f"Dataset path already exists but is incomplete: {dataset_root}. "
         f"Missing: {missing_text}. Move it aside, delete it, or use a new --dataset-repo-id."
+    )
+
+
+def _read_dataset_format(dataset_root: Path) -> str:
+    info_path = dataset_root / "meta" / "info.json"
+    if not info_path.exists():
+        return "unknown"
+    try:
+        with info_path.open("r", encoding="utf-8") as info_file:
+            version = str(json.load(info_file).get("codebase_version", "unknown"))
+    except (OSError, json.JSONDecodeError):
+        return "unknown"
+    if version.startswith("v2."):
+        return "v2.1"
+    if version.startswith("v3."):
+        return "v3.0"
+    return "unknown"
+
+
+def _is_empty_v21_dataset_root(dataset_root: Path, expected_format: str) -> bool:
+    if expected_format != "v2.1" or _read_dataset_format(dataset_root) != "v2.1":
+        return False
+    try:
+        info = json.loads((dataset_root / "meta" / "info.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    if int(info.get("total_episodes", 0)) != 0 or int(info.get("total_frames", 0)) != 0:
+        return False
+    files = [path.relative_to(dataset_root) for path in dataset_root.rglob("*") if path.is_file()]
+    return files == [Path("meta/info.json")]
+
+
+def _required_dataset_paths(dataset_root: Path, dataset_format: str) -> tuple[Path, ...]:
+    if dataset_format == "v2.1":
+        return (
+            dataset_root / "meta" / "info.json",
+            dataset_root / "meta" / "episodes.jsonl",
+            dataset_root / "meta" / "episodes_stats.jsonl",
+            dataset_root / "meta" / "tasks.jsonl",
+            dataset_root / "data",
+        )
+    return (
+        dataset_root / "meta" / "info.json",
+        dataset_root / "meta" / "tasks.parquet",
+        dataset_root / "meta" / "episodes",
+        dataset_root / "data",
     )
 
 

@@ -133,12 +133,17 @@ The OpenArm teleop script can record episodes directly into a LeRobot dataset:
 
 Recording uses a separate LeRobot writer process so Isaac Sim's Python environment
 does not need LeRobot installed. By default the writer runs with `.venv/bin/python`;
-override it with `LEROBOT_RECORDING_PYTHON` if you keep LeRobot elsewhere:
+override it with `LEROBOT_RECORDING_PYTHON` if you keep LeRobot elsewhere. Use a
+dedicated worker environment when you need a specific LeRobotDataset format:
 
 ```bash
-.venv/bin/python -m pip install "lerobot>=0.4.0"
-LEROBOT_RECORDING_PYTHON=/path/to/lerobot-env/bin/python ./scripts/run_openarm_teleop.sh --record
+uv venv .venv-lerobot-v21 --python 3.10
+uv pip install --python .venv-lerobot-v21/bin/python "lerobot==0.3.2"
+LEROBOT_RECORDING_PYTHON=$PWD/.venv-lerobot-v21/bin/python ./scripts/run_openarm_teleop.sh --record
 ```
+
+Set `recording.dataset_format` to `v2.1`, `v3.0`, or `auto`. `auto` uses the
+format written by the selected LeRobot worker.
 
 The OpenArm teleop script also publishes data for external recording:
 

@@ -3,7 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 import time
 
-from src.isaac_backend import CameraImagePublishers, CameraManager, IsaacApp, JointStatePublisher
+from src.isaac_backend import (
+    CameraImagePublishers,
+    CameraManager,
+    DomainRandomizer,
+    IsaacApp,
+    JointStatePublisher,
+)
 from src.launch.control_metrics import ControlMetricsReporter
 from src.launch.controller_provider import build_controller_provider_class, import_ros_interfaces
 from src.recording import (
@@ -63,6 +69,7 @@ def run_openarm_runtime(
     rclpy = None
     controller_provider = None
     camera_manager = None
+    domain_randomizer = None
     recorder = None
     recording_schema = None
     ros_started = False
@@ -92,6 +99,9 @@ def run_openarm_runtime(
             print(f"[ERROR] {exc}")
             return 1
         print(f"[Init] Found robot at: {adapter.robot_prim_path}")
+
+        domain_randomizer = DomainRandomizer(world.stage, adapter.config.get("domain_randomization"))
+        domain_randomizer.initialize()
 
         print("[Init] Loading IK Solvers...")
         ik_enabled = _initialize_ik(adapter)
@@ -168,6 +178,7 @@ def run_openarm_runtime(
             ik_enabled=ik_enabled,
             debug_ik=debug_ik,
             recording_settings=recording_settings,
+            domain_randomizer=domain_randomizer,
             recorder=recorder,
             recording_schema=recording_schema,
         )
@@ -316,6 +327,7 @@ def _run_control_loop(
     ik_enabled: bool,
     debug_ik: bool,
     recording_settings: RecordingConfig,
+    domain_randomizer: DomainRandomizer | None,
     recorder: LeRobotEpisodeRecorder | None,
     recording_schema,
 ) -> None:
@@ -346,6 +358,7 @@ def _run_control_loop(
             adapter=adapter,
             teleop_session=teleop_session,
             camera_manager=camera_manager,
+            domain_randomizer=domain_randomizer,
             recorder=recorder,
             recording_state=recording_state,
             session_ready=session_update.ready,
@@ -414,6 +427,7 @@ def _handle_button_events(
     adapter: OpenArmAdapter,
     teleop_session: BimanualTeleopSession,
     camera_manager: CameraManager,
+    domain_randomizer: DomainRandomizer | None,
     recorder: LeRobotEpisodeRecorder | None,
     recording_state: RecordingLoopState,
     session_ready: bool,
@@ -452,7 +466,7 @@ def _handle_button_events(
             recording_state.awaiting_discard_completion = True
             recorder.discard_episode_async(reason="scene_reset")
         print("[Scene] Reset requested")
-        _reset_scene(isaac_app, adapter, teleop_session)
+        _reset_scene(isaac_app, adapter, teleop_session, domain_randomizer)
         return True
     return False
 
@@ -539,10 +553,18 @@ def _reset_scene(
     isaac_app: IsaacApp,
     adapter: OpenArmAdapter,
     teleop_session: BimanualTeleopSession,
+    domain_randomizer: DomainRandomizer | None = None,
 ) -> None:
     isaac_app.reset_world()
     adapter.reset_runtime_state()
     teleop_session.reset(preserve_calibration=True)
+    if domain_randomizer is not None and domain_randomizer.enabled:
+        sample = domain_randomizer.randomize(isaac_app.step)
+        print(
+            "[Scene] Randomized: "
+            f"nuts={sample.nut_count}, bolts={sample.bolt_count}, "
+            f"light_intensity={sample.light_intensity}, floor_color={sample.floor_color}"
+        )
 
 
 def _handle_not_ready(

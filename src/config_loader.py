@@ -83,6 +83,7 @@ DEFAULT_MAIN_CONFIG = {
     },
     "recording": {
         "enabled": False,
+        "dataset_format": "v2.1",
         "root": "datasets",
         "repo_id": "local/quest3-openarm",
         "task": "Teleoperate OpenArm to complete the task",

@@ -114,6 +114,7 @@ class RecordingCameraConfig:
 @dataclass(frozen=True)
 class RecordingConfig:
     enabled: bool = False
+    dataset_format: str = "v2.1"
     root: str = "datasets"
     repo_id: str = "local/quest3-openarm"
     task: str = "Teleoperate OpenArm to complete the task"
@@ -151,6 +152,7 @@ class RecordingConfig:
             root = os.path.join(project_root, root)
         config = cls(
             enabled=bool(values.get("enabled", False)),
+            dataset_format=str(values.get("dataset_format", "v2.1")),
             root=root,
             repo_id=str(values.get("repo_id", "local/quest3-openarm")),
             task=str(values.get("task", "Teleoperate OpenArm to complete the task")),
@@ -190,6 +192,8 @@ class RecordingConfig:
     def validate(self) -> None:
         if self.fps <= 0:
             raise ValueError("Recording fps must be positive")
+        if self.dataset_format not in ("auto", "v2.1", "v3.0"):
+            raise ValueError("Recording dataset_format must be 'auto', 'v2.1', or 'v3.0'")
         if self.max_episodes is not None and self.max_episodes < 1:
             raise ValueError("Recording max_episodes must be at least 1 when provided")
         if self.queue_size_frames < 1:

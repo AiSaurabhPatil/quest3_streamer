@@ -115,6 +115,10 @@ class LeRobotEpisodeRecorder:
         configured_python = os.environ.get("LEROBOT_RECORDING_PYTHON")
         if configured_python:
             return configured_python
+        if self._config.dataset_format == "v2.1":
+            v21_python = os.path.join(self._project_root, ".venv-lerobot-v21", "bin", "python")
+            if os.path.exists(v21_python):
+                return v21_python
         return os.path.join(self._project_root, ".venv", "bin", "python")
 
     def _start_worker_process(self) -> None:

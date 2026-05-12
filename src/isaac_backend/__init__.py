@@ -2,6 +2,7 @@
 
 from .app import IsaacApp, IsaacAppConfig
 from .camera_manager import CameraManager, CameraManagerConfig, CameraManagerDiagnostics
+from .domain_randomization import DomainRandomizer
 from .ros_publishers import CameraImagePublishers, JointStatePublisher
 
 __all__ = [
@@ -9,6 +10,7 @@ __all__ = [
     "CameraManager",
     "CameraManagerConfig",
     "CameraManagerDiagnostics",
+    "DomainRandomizer",
     "IsaacApp",
     "IsaacAppConfig",
     "JointStatePublisher",

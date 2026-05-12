@@ -13,8 +13,8 @@ if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
 from src.config_loader import load_runtime_config  # noqa: E402
-from src.recording import ButtonEdgeMapper, RecordingConfig, build_recording_schema  # noqa: E402
-from src.recording.worker_process import _validate_existing_dataset_root  # noqa: E402
+from src.recording import ButtonEdgeMapper, LeRobotEpisodeRecorder, RecordingConfig, build_recording_schema  # noqa: E402
+from src.recording.worker_process import _supported_kwargs, _validate_existing_dataset_root  # noqa: E402
 from src.robot_adapters import OpenArmAdapter, RobotAction  # noqa: E402
 from src.teleop_core import ControllerButtons, ControllerState  # noqa: E402
 
@@ -30,6 +30,7 @@ class RecordingTests(unittest.TestCase):
         )
 
         self.assertTrue(config.enabled)
+        self.assertEqual(config.dataset_format, "v2.1")
         self.assertEqual(config.root, os.path.join(PROJECT_ROOT, "datasets/test"))
         self.assertEqual(config.buttons.save_episode, "left_primary")
         self.assertEqual(config.buttons.start_episode, "left_secondary")
@@ -60,6 +61,12 @@ class RecordingTests(unittest.TestCase):
         self.assertFalse(second.reset_scene)
         self.assertFalse(second.start_episode)
         self.assertFalse(released.save_episode)
+
+    def test_v21_recording_prefers_dedicated_worker_python(self):
+        config = RecordingConfig.from_mapping({"dataset_format": "v2.1"}, project_root=PROJECT_ROOT)
+        recorder = LeRobotEpisodeRecorder(config=config, schema=None, robot_type="openarm", project_root=PROJECT_ROOT)
+
+        self.assertTrue(recorder.worker_process.python.endswith(".venv-lerobot-v21/bin/python"))
 
     def test_openarm_recording_schema_uses_named_groups_and_cameras(self):
         runtime = load_runtime_config(project_root=PROJECT_ROOT, robot="openarm")
@@ -139,6 +146,52 @@ class RecordingTests(unittest.TestCase):
 
             with self.assertRaisesRegex(RuntimeError, "already exists but is incomplete"):
                 _validate_existing_dataset_root(dataset_root)
+
+    def test_v21_lerobot_dataset_root_validation_accepts_episode_layout(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            dataset_root = Path(temp_dir) / "local" / "quest3-openarm"
+            meta_dir = dataset_root / "meta"
+            meta_dir.mkdir(parents=True)
+            (meta_dir / "info.json").write_text('{"codebase_version": "v2.1"}', encoding="utf-8")
+            (meta_dir / "episodes.jsonl").write_text("", encoding="utf-8")
+            (meta_dir / "episodes_stats.jsonl").write_text("", encoding="utf-8")
+            (meta_dir / "tasks.jsonl").write_text("", encoding="utf-8")
+            (dataset_root / "data").mkdir()
+
+            _validate_existing_dataset_root(dataset_root, expected_format="v2.1")
+
+    def test_lerobot_dataset_root_validation_rejects_format_mismatch(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            dataset_root = Path(temp_dir) / "local" / "quest3-openarm"
+            meta_dir = dataset_root / "meta"
+            meta_dir.mkdir(parents=True)
+            (meta_dir / "info.json").write_text('{"codebase_version": "v3.0"}', encoding="utf-8")
+
+            with self.assertRaisesRegex(RuntimeError, "already exists with format v3.0"):
+                _validate_existing_dataset_root(dataset_root, expected_format="v2.1")
+
+    def test_supported_kwargs_filters_version_specific_lerobot_args(self):
+        def old_create(repo_id, root, fps, features, robot_type=None, use_videos=True):
+            return None
+
+        kwargs = _supported_kwargs(
+            old_create,
+            {
+                "repo_id": "local/test",
+                "root": "/tmp/test",
+                "fps": 30,
+                "features": {},
+                "robot_type": "openarm",
+                "use_videos": True,
+                "streaming_encoding": True,
+                "vcodec": "auto",
+            },
+        )
+
+        self.assertEqual(
+            set(kwargs),
+            {"repo_id", "root", "fps", "features", "robot_type", "use_videos"},
+        )
 
 
 if __name__ == "__main__":

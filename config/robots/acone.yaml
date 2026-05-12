@@ -107,3 +107,54 @@ recording:
       name: "right_gripper"
       value: "normalized_gripper"
       side: "right"
+
+domain_randomization:
+  enabled: true
+  seed: null
+  settle_steps: 90
+  prims:
+    floor: "/World/FlatGrid"
+    light_root: "/World/Environment"
+    looks: "/World/Looks"
+    left_tray: "/World/Bin_B04_20x35x14cm_PR_V_NVD_01"
+    middle_tray: "/World/Container_B02_40x30x06cm_PR_V_NVD_04"
+    right_tray: "/World/Tote_B08_60x40x15cm_PR_V_NVD_01"
+    nut: "/World/nut"
+    bolt: "/World/bolt"
+    spawn_root: "/World/RandomizedObjects"
+  assets:
+    nut_usd: "/home/saurabh/Development/ARX_Model/AC one/nut.usd"
+    bolt_usd: "/home/saurabh/Development/ARX_Model/AC one/bolt.usd"
+  lighting:
+    intensity: [300, 1800]
+    exposure: [-1.0, 1.0]
+    rotation_deg:
+      x: [35, 75]
+      y: [-15, 15]
+      z: [-180, 180]
+  floor:
+    colors: []
+  trays:
+    xy_jitter_m: 0.08
+    yaw_jitter_deg: 12.0
+    extra_paths:
+      - "/World/Container_B02_40x30x06cm_PR_V_NVD_04"
+      - "/World/Container_B02_40x30x06cm_PR_V_NVD_01"
+      - "/World/Container_H21_60x40x09cm_PR_V_NVD_01"
+  objects:
+    nut_count: [2, 3]
+    bolt_count: [4, 5]
+    scale: 2.0
+    nut_scale: [3.0, 3.0, 3.0]
+    spawn_z_offset_m: 0.06
+    use_bbox: false
+    spawn_tray_candidates:
+      - "/World/Container_B02_40x30x06cm_PR_V_NVD_04"
+      - "/World/Container_B02_40x30x06cm_PR_V_NVD_01"
+      - "/World/Container_H21_60x40x09cm_PR_V_NVD_01"
+    spawn_area_m:
+      x: [-0.20, 0.20]
+      y: [-0.12, 0.12]
+    bbox_margin_m: 0.05
+    min_distance_m: 0.045
+    yaw_deg: [-180, 180]
