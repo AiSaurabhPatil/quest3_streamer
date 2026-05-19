@@ -87,8 +87,8 @@ class ConfigLoaderTests(unittest.TestCase):
                     "robot_type: acone\n"
                     "usd: assets/acone.usd\n"
                     "urdf: assets/acone.urdf\n"
-                    "left_arm_config: acone_config/left_arm\n"
-                    "right_arm_config: acone_config/right_arm\n"
+                    "left_arm_config: robot_configs/acone_config/left_arm\n"
+                    "right_arm_config: robot_configs/acone_config/right_arm\n"
                     "left_arm:\n"
                     "  frame_name: left_link6\n"
                     "  joints: [left_joint1, left_joint2, left_joint3, left_joint4, left_joint5, left_joint6]\n"
@@ -118,7 +118,7 @@ class ConfigLoaderTests(unittest.TestCase):
 
         self.assertEqual(runtime.robot["left_arm"]["frame_name"], "left_tcp")
         self.assertEqual(runtime.robot["right_arm"]["frame_name"], "right_tcp")
-        self.assertTrue(runtime.robot["urdf"].endswith("acone_config/urdf/acone_with_tcp.urdf"))
+        self.assertTrue(runtime.robot["urdf"].endswith("robot_configs/acone_config/urdf/acone_with_tcp.urdf"))
 
         robot = ET.parse(runtime.robot["urdf"]).getroot()
         link_names = {link.attrib["name"] for link in robot.findall("link")}

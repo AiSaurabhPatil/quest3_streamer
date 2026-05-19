@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 
 from src.config_loader import default_project_root, load_runtime_config
-from src.launch.openarm_runtime import run_openarm_runtime
+from src.launch.bimanual_runtime import run_bimanual_runtime
 from src.robot_adapters import OpenArmAdapter
 from src.teleop_core import TeleopSessionConfig
 
@@ -95,6 +95,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
         type=int,
         help="Stop after this many saved episodes",
     )
+    parser.add_argument(
+        "--recording-verbose",
+        action="store_true",
+        help="Print recording progress while recording",
+    )
     return parser
 
 
@@ -138,11 +143,26 @@ def resolve_runtime_settings(args: argparse.Namespace) -> tuple[object, dict, di
     if args.max_episodes is not None:
         recording_config["max_episodes"] = args.max_episodes
         recording_config["enabled"] = True
+    if args.recording_verbose:
+        recording_config["verbose"] = True
+    elif _recording_cli_requested(args):
+        recording_config["verbose"] = True
     if args.disable_cameras:
         recording_cameras = dict(recording_config.get("cameras", {}))
         recording_cameras["enabled"] = False
         recording_config["cameras"] = recording_cameras
     return runtime, isaac_config, camera_config, debug_ik, recording_config
+
+
+def _recording_cli_requested(args: argparse.Namespace) -> bool:
+    return bool(
+        args.record
+        or args.dataset_root
+        or args.dataset_repo_id
+        or args.task
+        or args.recording_fps is not None
+        or args.max_episodes is not None
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -155,7 +175,7 @@ def main(argv: list[str] | None = None) -> int:
         runtime.main.get("teleop", {}),
         runtime.main.get("transport", {}),
     )
-    return run_openarm_runtime(
+    return run_bimanual_runtime(
         adapter=adapter,
         runtime_config=runtime_config,
         isaac_config=isaac_config,

@@ -62,6 +62,12 @@ class RobotAdapter(ABC):
     def get_diagnostics(self) -> AdapterDiagnostics:
         return AdapterDiagnostics()
 
+    def get_last_ik_debug(self) -> dict[str, dict[str, object]]:
+        return {}
+
+    def get_debug_end_effector_positions(self, joint_positions=None) -> dict[str, np.ndarray]:
+        return {}
+
     def get_recording_robot_type(self) -> str:
         return self.__class__.__name__.replace("Adapter", "").lower()
 

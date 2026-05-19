@@ -148,18 +148,19 @@ class LeRobotEpisodeRecorder:
             env=env,
             stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
-            stderr=subprocess.PIPE,
+            stderr=subprocess.PIPE if self._config.verbose else subprocess.DEVNULL,
             text=True,
             pass_fds=(child_read_fd, child_write_fd),
         )
         os.close(child_read_fd)
         os.close(child_write_fd)
-        self._worker_stderr_thread = threading.Thread(
-            target=self._drain_worker_stderr,
-            name="lerobot-recorder-stderr",
-            daemon=True,
-        )
-        self._worker_stderr_thread.start()
+        if self._config.verbose:
+            self._worker_stderr_thread = threading.Thread(
+                target=self._drain_worker_stderr,
+                name="lerobot-recorder-stderr",
+                daemon=True,
+            )
+            self._worker_stderr_thread.start()
 
         try:
             self._send_message(
@@ -192,10 +193,11 @@ class LeRobotEpisodeRecorder:
         )
         self._reader_thread.start()
         self._writer_thread.start()
-        print(
-            "[Recording] LeRobot writer process started "
-            f"with {self._recording_python} (pid={self._worker_process.pid})"
-        )
+        if self._config.verbose:
+            print(
+                "[Recording] LeRobot writer process started "
+                f"with {self._recording_python} (pid={self._worker_process.pid})"
+            )
 
     def _enqueue_command(self, message: dict[str, Any]) -> None:
         try:

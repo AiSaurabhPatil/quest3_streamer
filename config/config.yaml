@@ -57,7 +57,7 @@ isaac:
 # Camera capture and ROS image publishing
 cameras:
   enabled: true
-  resolution: [320, 240]
+  resolution: [224, 224]
   publish_interval_frames: 4
   queue_size: 3
   log_errors: true
@@ -71,7 +71,12 @@ recording:
   task: "Teleoperate OpenArm to complete the task"
   fps: 30
   max_episodes: null
+  verbose: false
+  encoder_threads: 4
+  image_writer_threads: 4
   auto_start_episode: false
+  cameras:
+    resolution: [224, 224]
   buttons:
     switch_camera: "right_primary"
     reset_scene: "right_secondary"
@@ -89,4 +94,4 @@ teleop:
   deadman_timeout_ms: 500
   hard_timeout_ms: 1000
   max_target_jump_m: 0.25
-  max_target_velocity_mps: 0.4
+  max_target_velocity_mps: 0.8

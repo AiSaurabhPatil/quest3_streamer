@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 import time
 
+import numpy as np
+
 from src.isaac_backend import (
     CameraImagePublishers,
     CameraManager,
@@ -31,6 +33,7 @@ class RecordingLoopState:
     awaiting_discard_completion: bool = False
     last_saved_reported: int = 0
     last_discarded_reported: int = 0
+    last_progress_report_s: float = 0.0
 
     def has_reached_target(self, saved_episodes: int) -> bool:
         return self.target_episodes is not None and saved_episodes >= self.target_episodes
@@ -48,7 +51,7 @@ class RecordingLoopState:
         return f"episode {next_episode}/{self.target_episodes}"
 
 
-def run_openarm_runtime(
+def run_bimanual_runtime(
     *,
     adapter: OpenArmAdapter,
     runtime_config: TeleopSessionConfig,
@@ -59,12 +62,14 @@ def run_openarm_runtime(
     project_root: str | None = None,
 ) -> int:
     robot_display_name = _adapter_display_name(adapter)
-    teleop_session = BimanualTeleopSession(runtime_config)
-    isaac_app = IsaacApp(isaac_config)
     recording_settings = RecordingConfig.from_mapping(
         recording_config,
         project_root=project_root or adapter.project_root,
     )
+    quiet_recording = recording_settings.enabled and not recording_settings.verbose
+    if quiet_recording:
+        isaac_config = _with_quiet_isaac_logging(isaac_config)
+    isaac_app = IsaacApp(isaac_config)
 
     rclpy = None
     controller_provider = None
@@ -82,7 +87,7 @@ def run_openarm_runtime(
             Node,
             PoseStamped,
             Joy,
-            node_name="isaac_openarm_teleop",
+            node_name=f"isaac_{adapter.config.get('robot_type', 'bimanual')}_teleop",
             hands=("left", "right"),
         )
 
@@ -116,6 +121,9 @@ def run_openarm_runtime(
         adapter.initialize_joint_mappings()
         dof_names = adapter.get_joint_names()
         _print_joint_info(adapter, dof_names)
+        if hasattr(adapter, "configure_runtime_home_from_current_pose"):
+            runtime_config = adapter.configure_runtime_home_from_current_pose(runtime_config)
+        teleop_session = BimanualTeleopSession(runtime_config)
 
         print("[Init] Initializing ROS2...")
         rclpy.init()
@@ -147,12 +155,6 @@ def run_openarm_runtime(
                     },
                     project_root=project_root or adapter.project_root,
                 )
-            recording_settings = _align_recording_camera_resolution(
-                recording_config=recording_config,
-                recording_settings=recording_settings,
-                camera_config=camera_config,
-                project_root=project_root or adapter.project_root,
-            )
             recording_schema = build_recording_schema(adapter, adapter.config, recording_settings)
             try:
                 recorder = LeRobotEpisodeRecorder(
@@ -210,37 +212,20 @@ def _is_known_ros_destroy_node_cleanup_error(exc: Exception) -> bool:
     return isinstance(exc, ValueError) and str(exc) == "list.remove(x): x not in list"
 
 
-def _align_recording_camera_resolution(
-    *,
-    recording_config: dict | None,
-    recording_settings: RecordingConfig,
-    camera_config: dict,
-    project_root: str,
-) -> RecordingConfig:
-    if not recording_settings.cameras.enabled or not camera_config.get("enabled", True):
-        return recording_settings
-
-    resolution = camera_config.get("resolution")
-    if not resolution:
-        return recording_settings
-
-    capture_resolution = (int(resolution[0]), int(resolution[1]))
-    if capture_resolution == recording_settings.cameras.resolution:
-        return recording_settings
-
-    recording_cameras = dict((recording_config or {}).get("cameras", {}))
-    recording_cameras["resolution"] = list(capture_resolution)
-    print(
-        "[Recording] Aligning camera feature resolution with capture resolution: "
-        f"{capture_resolution[0]}x{capture_resolution[1]}"
-    )
-    return RecordingConfig.from_mapping(
-        {
-            **(recording_config or {}),
-            "cameras": recording_cameras,
-        },
-        project_root=project_root,
-    )
+def _with_quiet_isaac_logging(isaac_config: dict) -> dict:
+    quiet_config = dict(isaac_config)
+    quiet_config["quiet_logging"] = True
+    simulation = dict(quiet_config.get("simulation", {}))
+    extra_args = list(simulation.get("extra_args", []))
+    for arg in (
+        "--/log/level=error",
+        "--/app/enableDeveloperWarnings=false",
+    ):
+        if arg not in extra_args:
+            extra_args.append(arg)
+    simulation["extra_args"] = extra_args
+    quiet_config["simulation"] = simulation
+    return quiet_config
 
 
 def _initialize_ik(adapter: OpenArmAdapter) -> bool:
@@ -295,14 +280,14 @@ def _print_ready(
         "[Camera] Viewport cameras: "
         f"{camera_manager.viewport_camera_names or ['Perspective']}"
     )
-    if recording_config.enabled:
+    if recording_config.enabled and recording_config.verbose:
         print(
             "[Recording] Enabled: "
             f"repo_id={recording_config.repo_id}, root={recording_config.root}, "
             f"fps={recording_config.fps}, max_episodes={recording_config.max_episodes}"
         )
         print("[Recording] Press Y to start each episode after your setup is ready")
-    else:
+    elif not recording_config.enabled:
         print("[Recording] Disabled")
 
 
@@ -332,14 +317,15 @@ def _run_control_loop(
     recording_schema,
 ) -> None:
     ik_disabled_reported = False
-    control_metrics = ControlMetricsReporter()
+    quiet_recording = recorder is not None and not recording_settings.verbose
+    control_metrics = ControlMetricsReporter(enabled=recorder is None and not debug_ik)
     button_mapper = ButtonEdgeMapper(recording_settings.buttons)
     recording_state = RecordingLoopState(
         target_episodes=recording_settings.max_episodes,
         recording_active=recording_settings.auto_start_episode and recorder is not None,
     )
 
-    if recorder is not None:
+    if recorder is not None and recording_settings.verbose:
         _print_recording_waiting_status(recording_state, recorder)
 
     while isaac_app.is_running():
@@ -348,10 +334,10 @@ def _run_control_loop(
         session_update = teleop_session.update(latest_states)
         button_events = button_mapper.update(latest_states)
 
-        if recorder is not None and _sync_recording_progress(recording_state, recorder):
+        if recorder is not None and _sync_recording_progress(recording_state, recorder, verbose=not quiet_recording):
             break
 
-        _log_session_events(session_update.events, controller_provider)
+        _log_session_events(session_update.events, controller_provider, enabled=not quiet_recording)
         reset_requested = _handle_button_events(
             button_events=button_events,
             isaac_app=isaac_app,
@@ -362,6 +348,7 @@ def _run_control_loop(
             recorder=recorder,
             recording_state=recording_state,
             session_ready=session_update.ready,
+            verbose_recording=not quiet_recording,
         )
         if reset_requested:
             isaac_app.step(render=True)
@@ -373,6 +360,7 @@ def _run_control_loop(
                 controller_provider,
                 session_update,
                 teleop_session.config,
+                verbose=not quiet_recording,
             )
             continue
 
@@ -381,8 +369,15 @@ def _run_control_loop(
             isaac_app.step(render=True)
             continue
 
-        _maybe_print_ik_debug(adapter, session_update, debug_ik)
         action = adapter.compute_action(session_update.targets)
+        _maybe_print_ik_debug(
+            adapter,
+            teleop_session,
+            session_update,
+            debug_ik,
+            current_positions=current_positions,
+            action_positions=action.joint_positions,
+        )
 
         if not ik_enabled and not ik_disabled_reported:
             print("[INFO] IK disabled; holding arm joints while grippers remain responsive")
@@ -407,12 +402,19 @@ def _run_control_loop(
                 action=action,
                 camera_frames=camera_frames or {},
             )
+            _maybe_print_recording_frame_progress(
+                recording_state,
+                recorder,
+                verbose=not quiet_recording,
+            )
         control_metrics.record(session_update, adapter, controller_provider.get_logger())
 
         isaac_app.step(render=True)
 
 
-def _log_session_events(events, controller_provider) -> None:
+def _log_session_events(events, controller_provider, *, enabled: bool = True) -> None:
+    if not enabled:
+        return
     for event in events:
         if event.level == "warning":
             controller_provider.get_logger().warn(event.message)
@@ -431,42 +433,52 @@ def _handle_button_events(
     recorder: LeRobotEpisodeRecorder | None,
     recording_state: RecordingLoopState,
     session_ready: bool,
+    verbose_recording: bool = True,
 ) -> bool:
     if button_events.switch_camera:
         switched_camera = camera_manager.switch_viewport_camera_next()
-        if switched_camera is not None:
+        if verbose_recording and switched_camera is not None:
             camera_name, camera_path = switched_camera
             print(f"[Camera] Switched to: {camera_name} ({camera_path})")
     if button_events.save_episode and recorder is not None:
         if not recording_state.recording_active:
-            print("[Recording] Ignored save request because no episode is currently recording")
+            if verbose_recording:
+                print("[Recording] Ignored save request because no episode is currently recording")
         elif recording_state.awaiting_save_completion or recording_state.awaiting_discard_completion:
-            print("[Recording] Save already in progress; waiting for recorder to finish")
+            if verbose_recording:
+                print("[Recording] Save already in progress; waiting for recorder to finish")
         else:
             recording_state.recording_active = False
             recording_state.awaiting_save_completion = True
-            print(f"[Recording] Save requested for {recording_state.next_episode_label(recorder.diagnostics.saved_episodes)}")
+            if verbose_recording:
+                print(f"[Recording] Save requested for {recording_state.next_episode_label(recorder.diagnostics.saved_episodes)}")
             recorder.save_episode_async(reason="quest_x")
     if button_events.start_episode and recorder is not None:
         if not session_ready:
-            print("[Recording] Wait for calibration to complete before starting an episode")
+            if verbose_recording:
+                print("[Recording] Wait for calibration to complete before starting an episode")
         elif recording_state.awaiting_save_completion or recording_state.awaiting_discard_completion:
-            print("[Recording] Waiting for previous save/discard to complete before starting the next episode")
+            if verbose_recording:
+                print("[Recording] Waiting for previous save/discard to complete before starting the next episode")
         elif recording_state.recording_active:
-            print("[Recording] Episode recording is already active")
+            if verbose_recording:
+                print("[Recording] Episode recording is already active")
         elif recording_state.has_reached_target(recorder.diagnostics.saved_episodes):
-            print(f"[Recording] Episode target already reached: {recording_state.progress_text(recorder.diagnostics.saved_episodes)}")
+            if verbose_recording:
+                print(f"[Recording] Episode target already reached: {recording_state.progress_text(recorder.diagnostics.saved_episodes)}")
         else:
             recording_state.recording_active = True
-            print(f"[Recording] Started {recording_state.next_episode_label(recorder.diagnostics.saved_episodes)}")
+            if verbose_recording:
+                print(f"[Recording] Started {recording_state.next_episode_label(recorder.diagnostics.saved_episodes)}")
     if button_events.reset_scene:
         if recorder is not None:
             recording_state.recording_active = False
             recording_state.awaiting_save_completion = False
             recording_state.awaiting_discard_completion = True
             recorder.discard_episode_async(reason="scene_reset")
-        print("[Scene] Reset requested")
-        _reset_scene(isaac_app, adapter, teleop_session, domain_randomizer)
+        if verbose_recording:
+            print("[Scene] Reset requested")
+        _reset_scene(isaac_app, adapter, teleop_session, domain_randomizer, verbose=verbose_recording)
         return True
     return False
 
@@ -474,23 +486,29 @@ def _handle_button_events(
 def _sync_recording_progress(
     recording_state: RecordingLoopState,
     recorder: LeRobotEpisodeRecorder,
+    *,
+    verbose: bool = True,
 ) -> bool:
     diagnostics = recorder.diagnostics
 
     if diagnostics.discarded_episodes != recording_state.last_discarded_reported:
         recording_state.last_discarded_reported = diagnostics.discarded_episodes
         recording_state.awaiting_discard_completion = False
-        print("[Recording] Cleared unsaved episode buffer")
-        _print_recording_waiting_status(recording_state, recorder)
+        if verbose:
+            print("[Recording] Cleared unsaved episode buffer")
+            _print_recording_waiting_status(recording_state, recorder)
 
     if diagnostics.saved_episodes != recording_state.last_saved_reported:
         recording_state.last_saved_reported = diagnostics.saved_episodes
         recording_state.awaiting_save_completion = False
-        print(f"[Recording] Saved {recording_state.progress_text(diagnostics.saved_episodes)}")
+        if verbose:
+            print(f"[Recording] Saved {recording_state.progress_text(diagnostics.saved_episodes)}")
         if recording_state.has_reached_target(diagnostics.saved_episodes):
-            print("[Recording] Target episode count reached; stopping teleoperation")
+            if verbose:
+                print("[Recording] Target episode count reached; stopping teleoperation")
             return True
-        _print_recording_waiting_status(recording_state, recorder)
+        if verbose:
+            _print_recording_waiting_status(recording_state, recorder)
 
     return False
 
@@ -512,6 +530,30 @@ def _print_recording_waiting_status(
         print(f"[Recording] Active: {recording_state.next_episode_label(recorder.diagnostics.saved_episodes)}")
         return
     print(f"[Recording] Ready to start {recording_state.next_episode_label(recorder.diagnostics.saved_episodes)} with Y")
+
+
+def _maybe_print_recording_frame_progress(
+    recording_state: RecordingLoopState,
+    recorder: LeRobotEpisodeRecorder,
+    *,
+    verbose: bool = True,
+) -> None:
+    if not verbose:
+        return
+    now_s = time.monotonic()
+    if now_s - recording_state.last_progress_report_s < 3.0:
+        return
+    recording_state.last_progress_report_s = now_s
+    diagnostics = recorder.diagnostics
+    print(
+        "[Recording] Active "
+        f"{recording_state.next_episode_label(diagnostics.saved_episodes)}: "
+        f"queued={diagnostics.frames_enqueued}, "
+        f"written={diagnostics.frames_written}, "
+        f"dropped={diagnostics.frames_dropped_queue_full}, "
+        f"queue_depth={diagnostics.queue_depth}"
+    )
+
 
 def _maybe_record_frame(
     *,
@@ -554,17 +596,20 @@ def _reset_scene(
     adapter: OpenArmAdapter,
     teleop_session: BimanualTeleopSession,
     domain_randomizer: DomainRandomizer | None = None,
+    *,
+    verbose: bool = True,
 ) -> None:
     isaac_app.reset_world()
     adapter.reset_runtime_state()
     teleop_session.reset(preserve_calibration=True)
     if domain_randomizer is not None and domain_randomizer.enabled:
         sample = domain_randomizer.randomize(isaac_app.step)
-        print(
-            "[Scene] Randomized: "
-            f"nuts={sample.nut_count}, bolts={sample.bolt_count}, "
-            f"light_intensity={sample.light_intensity}, floor_color={sample.floor_color}"
-        )
+        if verbose:
+            print(
+                "[Scene] Randomized: "
+                f"nuts={sample.nut_count}, bolts={sample.bolt_count}, "
+                f"light_intensity={sample.light_intensity}, floor_color={sample.floor_color}"
+            )
 
 
 def _handle_not_ready(
@@ -572,6 +617,8 @@ def _handle_not_ready(
     controller_provider,
     session_update,
     runtime_config: TeleopSessionConfig,
+    *,
+    verbose: bool = True,
 ) -> None:
     if controller_provider.total_pose_count > 0:
         calibration_status = session_update.calibration_status
@@ -591,27 +638,117 @@ def _handle_not_ready(
                 f"({calibration_status.right_samples}/{runtime_config.calibration_samples})"
             )
         )
-        if controller_provider.total_pose_count % 30 == 1:
+        if verbose and controller_provider.total_pose_count % 30 == 1:
             print(f"[Calibration] Left: {left_status} | Right: {right_status}")
     else:
-        controller_provider.maybe_report_waiting_for_controllers()
+        if verbose:
+            controller_provider.maybe_report_waiting_for_controllers()
     isaac_app.step(render=True)
 
 
-def _maybe_print_ik_debug(adapter: OpenArmAdapter, session_update, debug_ik: bool) -> None:
+def _maybe_print_ik_debug(
+    adapter: OpenArmAdapter,
+    teleop_session: BimanualTeleopSession,
+    session_update,
+    debug_ik: bool,
+    *,
+    current_positions,
+    action_positions,
+) -> None:
     diagnostics = adapter.get_diagnostics()
-    frame_count = sum(diagnostics.counters.values())
-    if debug_ik and frame_count % 100 == 0:
-        print(
-            "[IK Debug] Left target: "
-            f"pos={session_update.targets.left_ee.position_xyz}, "
-            f"rot={session_update.targets.left_ee.orientation_wxyz}"
-        )
-        print(
-            "[IK Debug] Right target: "
-            f"pos={session_update.targets.right_ee.position_xyz}, "
-            f"rot={session_update.targets.right_ee.orientation_wxyz}"
-        )
+    frame_count = (
+        diagnostics.counters.get("left_ik_success", 0)
+        + diagnostics.counters.get("left_ik_fail", 0)
+        + diagnostics.counters.get("right_ik_success", 0)
+        + diagnostics.counters.get("right_ik_fail", 0)
+    )
+    if not debug_ik or frame_count == 0 or frame_count % 200 != 0:
+        return
+
+    current_fk = adapter.get_debug_end_effector_positions(current_positions)
+    commanded_fk = adapter.get_debug_end_effector_positions(action_positions)
+    ik_debug = adapter.get_last_ik_debug()
+    print("[IK Debug] Controller-to-TCP tracking")
+    _print_hand_debug(
+        hand="left",
+        runtime=teleop_session.left,
+        frame_transform=teleop_session.frame_transform,
+        pos_scale=teleop_session.config.pos_scale,
+        target=session_update.targets.left_ee.position_xyz,
+        current_fk=current_fk.get("left"),
+        commanded_fk=commanded_fk.get("left"),
+        ik_debug=ik_debug.get("left"),
+    )
+    _print_hand_debug(
+        hand="right",
+        runtime=teleop_session.right,
+        frame_transform=teleop_session.frame_transform,
+        pos_scale=teleop_session.config.pos_scale,
+        target=session_update.targets.right_ee.position_xyz,
+        current_fk=current_fk.get("right"),
+        commanded_fk=commanded_fk.get("right"),
+        ik_debug=ik_debug.get("right"),
+    )
+
+
+def _print_hand_debug(
+    *,
+    hand: str,
+    runtime,
+    frame_transform,
+    pos_scale,
+    target,
+    current_fk,
+    commanded_fk,
+    ik_debug,
+) -> None:
+    state = runtime.last_controller_state
+    controller_pos = None
+    xr_delta = None
+    robot_delta = None
+    raw_target = None
+    if state is not None and state.pose is not None and runtime.reference_position is not None:
+        controller_pos = np.asarray(state.pose.position_xyz, dtype=float)
+        xr_delta = controller_pos - runtime.reference_position
+        robot_delta = frame_transform.position_offset_to_robot(xr_delta)
+        raw_target = runtime.home_position + robot_delta * pos_scale
+
+    print(
+        f"  {hand}: ctrl={_fmt(controller_pos)} ref={_fmt(runtime.reference_position)} "
+        f"xr_delta={_fmt(xr_delta)} robot_delta={_fmt(robot_delta)}"
+    )
+    print(
+        f"  {hand}: raw_target={_fmt(raw_target)} smoothed_target={_fmt(target)} "
+        f"current_fk={_fmt(current_fk)} commanded_fk={_fmt(commanded_fk)}"
+    )
+    print(
+        f"  {hand}: err_current={_fmt_error(target, current_fk)} "
+        f"err_commanded={_fmt_error(target, commanded_fk)}"
+    )
+    print(f"  {hand}: ik_status={_fmt_mapping(ik_debug)}")
+
+
+def _fmt(values) -> str:
+    if values is None:
+        return "None"
+    return np.array2string(
+        np.asarray(values, dtype=float).reshape(-1),
+        precision=4,
+        suppress_small=True,
+    )
+
+
+def _fmt_error(target, measured) -> str:
+    if target is None or measured is None:
+        return "None"
+    error = np.asarray(target, dtype=float).reshape(3) - np.asarray(measured, dtype=float).reshape(3)
+    return f"{_fmt(error)} |norm={np.linalg.norm(error):.4f}m"
+
+
+def _fmt_mapping(values) -> str:
+    if not values:
+        return "None"
+    return " ".join(f"{key}={value}" for key, value in values.items())
 
 
 def _print_session_statistics(

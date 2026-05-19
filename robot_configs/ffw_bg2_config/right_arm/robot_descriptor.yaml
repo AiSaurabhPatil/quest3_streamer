@@ -1,0 +1,16 @@
+# Lula Robot Descriptor for FFW BG2 Right Arm
+api_version: 1.0
+
+cspace:
+  - arm_r_joint1
+  - arm_r_joint2
+  - arm_r_joint3
+  - arm_r_joint4
+  - arm_r_joint5
+  - arm_r_joint6
+  - arm_r_joint7
+
+default_q: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+
+root_link: arm_base_link
+end_effector: right_tcp

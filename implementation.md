@@ -36,7 +36,7 @@ Important current files:
 - `scripts/run_openarm_teleop.sh`: Starts Isaac Sim Python for OpenArm.
 - `scripts/run_panda_teleop.sh`: Starts Isaac Sim Python for Panda.
 - `config/config.yaml`: Existing central config, currently underused.
-- `openarm_config/`: OpenArm USD, URDF, and Lula descriptors.
+- `robot_configs/openarm_config/`: OpenArm USD, URDF, and Lula descriptors.
 
 Known mismatches and technical debt:
 
@@ -160,10 +160,10 @@ Update `config/config.yaml` to be the source of truth:
 paths:
   isaac_sim: "/home/saurabh/isaac_sim"
   openarm:
-    usd: "openarm_config/openarm_bimanual/openarm_bimanual.usd"
-    urdf: "openarm_config/openarm_bimanual_stl.urdf"
-    left_arm_config: "openarm_config/left_arm"
-    right_arm_config: "openarm_config/right_arm"
+    usd: "robot_configs/openarm_config/openarm_bimanual/openarm_bimanual.usd"
+    urdf: "robot_configs/openarm_config/openarm_bimanual_stl.urdf"
+    left_arm_config: "robot_configs/openarm_config/left_arm"
+    right_arm_config: "robot_configs/openarm_config/right_arm"
   panda:
     usd: "environment.usd"
   certs:
@@ -533,10 +533,10 @@ Suggested config:
 
 ```yaml
 robot_type: openarm
-usd: "openarm_config/openarm_bimanual/openarm_bimanual.usd"
-urdf: "openarm_config/openarm_bimanual_stl.urdf"
-left_arm_config: "openarm_config/left_arm"
-right_arm_config: "openarm_config/right_arm"
+usd: "robot_configs/openarm_config/openarm_bimanual/openarm_bimanual.usd"
+urdf: "robot_configs/openarm_config/openarm_bimanual_stl.urdf"
+left_arm_config: "robot_configs/openarm_config/left_arm"
+right_arm_config: "robot_configs/openarm_config/right_arm"
 
 prim_search_paths:
   - "/World/Robot"

@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import argparse
 from copy import deepcopy
+import os
 
 from src.config_loader import default_project_root, load_runtime_config
-from src.launch.openarm_runtime import run_openarm_runtime
+from src.launch.bimanual_runtime import run_bimanual_runtime
 from src.robot_adapters import AconeAdapter
 from src.teleop_core import TeleopSessionConfig
 
@@ -71,6 +72,17 @@ def build_arg_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Force Isaac Sim to run headless",
     )
+    webrtc_group = parser.add_mutually_exclusive_group()
+    webrtc_group.add_argument(
+        "--webrtc",
+        action="store_true",
+        help="Run Isaac Sim in WebRTC streaming mode",
+    )
+    webrtc_group.add_argument(
+        "--no-webrtc",
+        action="store_true",
+        help="Disable WebRTC streaming mode",
+    )
     parser.add_argument(
         "--disable-cameras",
         action="store_true",
@@ -108,6 +120,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
         type=int,
         help="Stop after this many saved episodes",
     )
+    parser.add_argument(
+        "--recording-verbose",
+        action="store_true",
+        help="Print recording progress while recording",
+    )
     return parser
 
 
@@ -126,6 +143,8 @@ def resolve_runtime_settings(args: argparse.Namespace) -> tuple[object, dict, di
         simulation = dict(isaac_config.get("simulation", {}))
         simulation["headless"] = True
         isaac_config["simulation"] = simulation
+    if args.webrtc:
+        _enable_webrtc_streaming(isaac_config)
 
     camera_config = dict(runtime.main.get("cameras", {}))
     if args.disable_cameras:
@@ -162,11 +181,52 @@ def resolve_runtime_settings(args: argparse.Namespace) -> tuple[object, dict, di
     if args.max_episodes is not None:
         recording_config["max_episodes"] = args.max_episodes
         recording_config["enabled"] = True
+    if args.recording_verbose:
+        recording_config["verbose"] = True
+    elif _recording_cli_requested(args):
+        recording_config["verbose"] = True
     if args.disable_cameras:
         recording_cameras = dict(recording_config.get("cameras", {}))
         recording_cameras["enabled"] = False
         recording_config["cameras"] = recording_cameras
     return runtime, isaac_config, camera_config, debug_ik, recording_config
+
+
+def _recording_cli_requested(args: argparse.Namespace) -> bool:
+    return bool(
+        args.record
+        or args.dataset_root
+        or args.dataset_repo_id
+        or args.task
+        or args.recording_fps is not None
+        or args.max_episodes is not None
+    )
+
+
+def _enable_webrtc_streaming(isaac_config: dict) -> None:
+    isaac_sim_path = os.environ.get("ISAAC_SIM_PATH", "/home/saurabh/isaac_sim")
+    isaac_config["experience"] = os.path.join(isaac_sim_path, "apps", "isaacsim.exp.full.streaming.kit")
+    isaac_config["webrtc_streaming"] = True
+    isaac_config["headless"] = True
+    simulation = dict(isaac_config.get("simulation", {}))
+    simulation["headless"] = True
+    simulation["hide_ui"] = False
+    webrtc_gpu = int(os.environ.get("ISAAC_WEBRTC_GPU", "0"))
+    simulation["active_gpu"] = webrtc_gpu
+    simulation["physics_gpu"] = webrtc_gpu
+    simulation["multi_gpu"] = False
+    simulation["max_gpu_count"] = 1
+    extra_args = list(simulation.get("extra_args", []))
+    for arg in (
+        "--/app/window/drawMouse=true",
+        "--/app/livestream/nvcf/quitOnSessionEnded=false",
+        "--/renderer/multiGpu/enabled=false",
+        "--/renderer/multiGpu/maxGpuCount=1",
+    ):
+        if arg not in extra_args:
+            extra_args.append(arg)
+    simulation["extra_args"] = extra_args
+    isaac_config["simulation"] = simulation
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -180,7 +240,7 @@ def main(argv: list[str] | None = None) -> int:
         dict(runtime.robot.get("teleop", {})),
         runtime.main.get("transport", {}),
     )
-    return run_openarm_runtime(
+    return run_bimanual_runtime(
         adapter=adapter,
         runtime_config=runtime_config,
         isaac_config=isaac_config,

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import os
+from os import cpu_count
 from typing import Any
 
 
@@ -90,12 +91,12 @@ class RecordingCameraConfig:
     include: tuple[str, ...] = ()
     feature_prefix: str = "observation.images"
     dtype: str = "video"
-    resolution: tuple[int, int] = (480, 360)
+    resolution: tuple[int, int] = (224, 224)
 
     @classmethod
     def from_mapping(cls, values: dict[str, Any] | None):
         values = values or {}
-        resolution = values.get("resolution", (480, 360))
+        resolution = values.get("resolution", (224, 224))
         if len(resolution) != 2:
             raise ValueError("Recording camera resolution must contain [width, height]")
         width = int(resolution[0])
@@ -125,8 +126,8 @@ class RecordingConfig:
     use_videos: bool = True
     streaming_encoding: bool = True
     vcodec: str = "auto"
-    encoder_threads: int = 2
-    image_writer_threads: int = 2
+    encoder_threads: int = min(4, max(1, cpu_count() or 1))
+    image_writer_threads: int = min(4, max(1, cpu_count() or 1))
     queue_size_frames: int = 8
     drop_when_full: bool = True
     save_parallel_encoding: bool = True
@@ -134,6 +135,7 @@ class RecordingConfig:
     push_to_hub_on_shutdown: bool = False
     private_hub_repo: bool = False
     auto_save_on_shutdown: bool = False
+    verbose: bool = False
     buttons: RecordingButtonConfig = field(default_factory=RecordingButtonConfig)
     reset_policy: RecordingResetPolicy = field(default_factory=RecordingResetPolicy)
     state: RecordingVectorConfig = field(
@@ -165,8 +167,8 @@ class RecordingConfig:
             use_videos=bool(values.get("use_videos", True)),
             streaming_encoding=bool(values.get("streaming_encoding", True)),
             vcodec=str(values.get("vcodec", "auto")),
-            encoder_threads=int(values.get("encoder_threads", 2)),
-            image_writer_threads=int(values.get("image_writer_threads", 2)),
+            encoder_threads=int(values.get("encoder_threads", min(4, max(1, cpu_count() or 1)))),
+            image_writer_threads=int(values.get("image_writer_threads", min(4, max(1, cpu_count() or 1)))),
             queue_size_frames=int(values.get("queue_size_frames", 8)),
             drop_when_full=bool(values.get("drop_when_full", True)),
             save_parallel_encoding=bool(values.get("save_parallel_encoding", True)),
@@ -174,6 +176,7 @@ class RecordingConfig:
             push_to_hub_on_shutdown=bool(values.get("push_to_hub_on_shutdown", False)),
             private_hub_repo=bool(values.get("private_hub_repo", False)),
             auto_save_on_shutdown=bool(values.get("auto_save_on_shutdown", False)),
+            verbose=bool(values.get("verbose", False)),
             buttons=RecordingButtonConfig.from_mapping(values.get("buttons")),
             reset_policy=RecordingResetPolicy.from_mapping(values.get("reset_policy")),
             state=RecordingVectorConfig.from_mapping(

@@ -45,7 +45,7 @@ Primary references:
 
 Important existing files:
 
-- `src/launch/openarm_runtime.py`
+- `src/launch/bimanual_runtime.py`
   - Main OpenArm Isaac control loop.
   - Computes `action = adapter.compute_action(session_update.targets)`.
   - Applies action via `adapter.apply_action(action)`.
@@ -636,7 +636,7 @@ Future improvement:
 
 ## Control Loop Integration
 
-Modify `src/launch/openarm_runtime.py`.
+Modify `src/launch/bimanual_runtime.py`.
 
 New imports:
 
@@ -650,10 +650,10 @@ from src.recording import (
 )
 ```
 
-`run_openarm_runtime` signature additions:
+`run_bimanual_runtime` signature additions:
 
 ```python
-def run_openarm_runtime(..., recording_config: dict | None = None) -> int:
+def run_bimanual_runtime(..., recording_config: dict | None = None) -> int:
 ```
 
 Setup after adapter joint mappings and camera manager start:
@@ -765,7 +765,7 @@ State timing decision:
 
 `B` should reset the scene in the viewport.
 
-Add helper in `openarm_runtime.py`:
+Add helper in `bimanual_runtime.py`:
 
 ```python
 def _reset_scene(
@@ -920,9 +920,9 @@ parser.add_argument("--recording-fps", type=int, help="Override recording.fps")
 
 In `resolve_runtime_settings`, return `recording_config` as an additional item. Merge CLI overrides into `runtime.main["recording"]`.
 
-Update `run_openarm_runtime(...)` call to pass `recording_config`.
+Update `run_bimanual_runtime(...)` call to pass `recording_config`.
 
-Later update `panda_teleop.py` similarly, but implement OpenArm first because it is already factored through `run_openarm_runtime`.
+Later update `panda_teleop.py` similarly, but implement OpenArm first because it is already factored through `run_bimanual_runtime`.
 
 ## Dependency Changes
 
@@ -994,7 +994,7 @@ Update `tests/test_launch_phase9.py`:
 3. Add schema builder and OpenArm recording vector extraction.
 4. Modify `CameraManager.update` to optionally return captured RGB frames.
 5. Add async LeRobot recorder wrapper with lazy LeRobot import.
-6. Wire recorder into `openarm_teleop.py` and `openarm_runtime.py`.
+6. Wire recorder into `openarm_teleop.py` and `bimanual_runtime.py`.
 7. Add scene reset handling for B.
 8. Add tests for config/buttons/schema/vector extraction.
 9. Add LeRobot smoke test guarded by import availability.

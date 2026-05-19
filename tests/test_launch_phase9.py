@@ -12,11 +12,11 @@ from src.launch.openarm_teleop import build_arg_parser as build_openarm_parser  
 from src.launch.openarm_teleop import resolve_runtime_settings as resolve_openarm_settings  # noqa: E402
 from src.launch.acone_teleop import build_arg_parser as build_acone_parser  # noqa: E402
 from src.launch.acone_teleop import resolve_runtime_settings as resolve_acone_settings  # noqa: E402
-from src.launch.openarm_runtime import _align_recording_camera_resolution  # noqa: E402
+from src.launch.ffw_bg2_teleop import build_arg_parser as build_ffw_bg2_parser  # noqa: E402
+from src.launch.ffw_bg2_teleop import resolve_runtime_settings as resolve_ffw_bg2_settings  # noqa: E402
 from src.launch.panda_teleop import build_arg_parser as build_panda_parser  # noqa: E402
 from src.launch.panda_teleop import resolve_runtime_settings as resolve_panda_settings  # noqa: E402
 from src.launch.webxr_bridge import build_arg_parser as build_bridge_parser  # noqa: E402
-from src.recording import RecordingConfig  # noqa: E402
 
 
 class LaunchPhase9Tests(unittest.TestCase):
@@ -54,6 +54,7 @@ class LaunchPhase9Tests(unittest.TestCase):
         self.assertEqual(recording_config["task"], "Test task")
         self.assertEqual(recording_config["fps"], 15)
         self.assertEqual(recording_config["max_episodes"], 5)
+        self.assertTrue(recording_config["verbose"])
         self.assertFalse(recording_config["cameras"]["enabled"])
 
     def test_openarm_launcher_rejects_non_openarm_robot(self):
@@ -71,27 +72,66 @@ class LaunchPhase9Tests(unittest.TestCase):
 
         self.assertEqual(runtime.robot_name, "acone")
         self.assertTrue(recording_config["enabled"])
+        self.assertTrue(recording_config["verbose"])
         self.assertEqual(recording_config["repo_id"], "local/quest3-acone")
         self.assertEqual(
             recording_config["cameras"]["include"],
             ["head_camera", "left_wrist_camera", "right_wrist_camera"],
         )
 
-    def test_recording_camera_resolution_tracks_capture_resolution(self):
-        recording_map = {
-            "enabled": True,
-            "cameras": {"enabled": True, "resolution": [480, 360]},
-        }
-        recording = RecordingConfig.from_mapping(recording_map, project_root=PROJECT_ROOT)
+    def test_acone_webrtc_forces_headless_streaming_experience(self):
+        parser = build_acone_parser()
+        args = parser.parse_args(["--webrtc"])
 
-        aligned = _align_recording_camera_resolution(
-            recording_config=recording_map,
-            recording_settings=recording,
-            camera_config={"enabled": True, "resolution": [320, 240]},
-            project_root=PROJECT_ROOT,
+        _, isaac_config, _, _, _ = resolve_acone_settings(args)
+
+        self.assertTrue(isaac_config["headless"])
+        self.assertTrue(isaac_config["simulation"]["headless"])
+        self.assertFalse(isaac_config["simulation"]["hide_ui"])
+        self.assertFalse(isaac_config["simulation"]["multi_gpu"])
+        self.assertEqual(isaac_config["simulation"]["max_gpu_count"], 1)
+        self.assertEqual(isaac_config["simulation"]["active_gpu"], 0)
+        self.assertEqual(isaac_config["simulation"]["physics_gpu"], 0)
+        self.assertTrue(isaac_config["webrtc_streaming"])
+        self.assertTrue(isaac_config["experience"].endswith("isaacsim.exp.full.streaming.kit"))
+
+    def test_ffw_bg2_recording_uses_robot_defaults(self):
+        parser = build_ffw_bg2_parser()
+        args = parser.parse_args(["--record"])
+
+        runtime, _, _, _, recording_config = resolve_ffw_bg2_settings(args)
+
+        self.assertEqual(runtime.robot_name, "ffw_bg2")
+        self.assertTrue(recording_config["enabled"])
+        self.assertTrue(recording_config["verbose"])
+        self.assertEqual(recording_config["repo_id"], "local/quest3-ffw-bg2")
+        self.assertEqual(
+            recording_config["cameras"]["include"],
+            ["head_camera", "left_wrist_camera", "right_wrist_camera"],
         )
 
-        self.assertEqual(aligned.cameras.resolution, (320, 240))
+    def test_ffw_bg2_launcher_rejects_non_ffw_bg2_robot(self):
+        parser = build_ffw_bg2_parser()
+        args = parser.parse_args(["--robot", "openarm"])
+
+        with self.assertRaises(ValueError):
+            resolve_ffw_bg2_settings(args)
+
+    def test_ffw_bg2_webrtc_forces_headless_streaming_experience(self):
+        parser = build_ffw_bg2_parser()
+        args = parser.parse_args(["--webrtc"])
+
+        _, isaac_config, _, _, _ = resolve_ffw_bg2_settings(args)
+
+        self.assertTrue(isaac_config["headless"])
+        self.assertTrue(isaac_config["simulation"]["headless"])
+        self.assertFalse(isaac_config["simulation"]["hide_ui"])
+        self.assertFalse(isaac_config["simulation"]["multi_gpu"])
+        self.assertEqual(isaac_config["simulation"]["max_gpu_count"], 1)
+        self.assertEqual(isaac_config["simulation"]["active_gpu"], 0)
+        self.assertEqual(isaac_config["simulation"]["physics_gpu"], 0)
+        self.assertTrue(isaac_config["webrtc_streaming"])
+        self.assertTrue(isaac_config["experience"].endswith("isaacsim.exp.full.streaming.kit"))
 
     def test_panda_cli_overrides_headless_and_disable_cameras(self):
         parser = build_panda_parser()

@@ -14,7 +14,11 @@ if PROJECT_ROOT not in sys.path:
 
 from src.config_loader import load_runtime_config  # noqa: E402
 from src.recording import ButtonEdgeMapper, LeRobotEpisodeRecorder, RecordingConfig, build_recording_schema  # noqa: E402
-from src.recording.worker_process import _supported_kwargs, _validate_existing_dataset_root  # noqa: E402
+from src.recording.worker_process import (  # noqa: E402
+    _is_recreatable_empty_dataset_root,
+    _supported_kwargs,
+    _validate_existing_dataset_root,
+)
 from src.robot_adapters import OpenArmAdapter, RobotAction  # noqa: E402
 from src.teleop_core import ControllerButtons, ControllerState  # noqa: E402
 
@@ -34,7 +38,7 @@ class RecordingTests(unittest.TestCase):
         self.assertEqual(config.root, os.path.join(PROJECT_ROOT, "datasets/test"))
         self.assertEqual(config.buttons.save_episode, "left_primary")
         self.assertEqual(config.buttons.start_episode, "left_secondary")
-        self.assertEqual(config.cameras.resolution, (480, 360))
+        self.assertEqual(config.cameras.resolution, (224, 224))
 
     def test_button_edge_mapper_only_emits_rising_edges(self):
         mapper = ButtonEdgeMapper(RecordingConfig.from_mapping({}, project_root=PROJECT_ROOT).buttons)
@@ -87,7 +91,7 @@ class RecordingTests(unittest.TestCase):
         self.assertEqual(schema.state_spec.names[7], "left_gripper")
         self.assertEqual(schema.state_spec.names[-1], "right_gripper")
         self.assertEqual(len(schema.camera_specs), 3)
-        self.assertEqual(schema.camera_specs[0].shape, (3, 360, 480))
+        self.assertEqual(schema.camera_specs[0].shape, (3, 224, 224))
 
     def test_openarm_recording_vector_normalizes_grippers(self):
         runtime = load_runtime_config(project_root=PROJECT_ROOT, robot="openarm")
@@ -159,6 +163,21 @@ class RecordingTests(unittest.TestCase):
             (dataset_root / "data").mkdir()
 
             _validate_existing_dataset_root(dataset_root, expected_format="v2.1")
+
+    def test_zero_episode_v21_dataset_root_can_be_recreated(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            dataset_root = Path(temp_dir) / "local" / "quest3-openarm"
+            meta_dir = dataset_root / "meta"
+            meta_dir.mkdir(parents=True)
+            (dataset_root / "data").mkdir()
+            (dataset_root / "videos").mkdir()
+            (meta_dir / "info.json").write_text(
+                '{"codebase_version": "v2.1", "total_episodes": 0, "total_frames": 0}',
+                encoding="utf-8",
+            )
+            (meta_dir / "episodes.jsonl").write_text("", encoding="utf-8")
+
+            self.assertTrue(_is_recreatable_empty_dataset_root(dataset_root, "v2.1"))
 
     def test_lerobot_dataset_root_validation_rejects_format_mismatch(self):
         with tempfile.TemporaryDirectory() as temp_dir:

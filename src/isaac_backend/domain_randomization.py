@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import colorsys
 from dataclasses import dataclass
 import math
 import random
@@ -167,9 +168,9 @@ class DomainRandomizer:
             self.rng.uniform(*[float(v) for v in rotation.get("y", [-15.0, 15.0])]),
             self.rng.uniform(*[float(v) for v in rotation.get("z", [-180.0, 180.0])]),
         ]
-        for prim in light_prims or [root_prim]:
-            translate, _, scale = self._get_xform_vectors(prim)
-            self._set_xform_vectors(prim, translate, sampled_rotate, scale)
+        if root_prim.GetTypeName() == "Xform":
+            translate, _, scale = self._get_xform_vectors(root_prim)
+            self._set_xform_vectors(root_prim, translate, sampled_rotate, scale)
         return intensity
 
     def _ensure_floor_material(self) -> None:
@@ -209,26 +210,33 @@ class DomainRandomizer:
         if colors:
             return tuple(float(v) for v in self.rng.choice(colors))
 
-        hue = self.rng.random()
-        saturation = self.rng.uniform(0.45, 0.9)
-        value = self.rng.uniform(0.35, 0.85)
-        sector = int(hue * 6.0)
-        fraction = hue * 6.0 - sector
-        p = value * (1.0 - saturation)
-        q = value * (1.0 - fraction * saturation)
-        t = value * (1.0 - (1.0 - fraction) * saturation)
-        sector %= 6
-        if sector == 0:
-            return value, t, p
-        if sector == 1:
-            return q, value, p
-        if sector == 2:
-            return p, value, t
-        if sector == 3:
-            return p, q, value
-        if sector == 4:
-            return t, p, value
-        return value, p, q
+        floor_families = [
+            # 30% similar to metallic nuts/bolts: learn shape and texture, not only contrast.
+            (0.30, ((0.0, 360.0), (0.0, 0.05), (0.30, 0.70))),
+            # 35% remaining core realistic industrial/lab contrast surfaces.
+            (0.12, ((30.0, 60.0), (0.05, 0.15), (0.75, 0.90))),
+            (0.12, ((25.0, 45.0), (0.10, 0.25), (0.40, 0.65))),
+            (0.11, ((0.0, 360.0), (0.0, 0.05), (0.10, 0.25))),
+            # 25% moderate plausible but less common surfaces.
+            (0.07, ((200.0, 220.0), (0.10, 0.25), (0.35, 0.55))),
+            (0.06, ((80.0, 120.0), (0.10, 0.20), (0.30, 0.50))),
+            (0.06, ((15.0, 35.0), (0.15, 0.30), (0.25, 0.45))),
+            (0.06, ((210.0, 240.0), (0.05, 0.15), (0.45, 0.65))),
+            # 10% mild extremes. Saturation and lightness stay bounded to avoid neon/black/white.
+            (0.025, ((170.0, 190.0), (0.15, 0.30), (0.30, 0.50))),
+            (0.025, ((340.0, 360.0), (0.10, 0.25), (0.40, 0.55))),
+            (0.025, ((40.0, 55.0), (0.20, 0.35), (0.40, 0.55))),
+            (0.025, ((220.0, 240.0), (0.15, 0.30), (0.15, 0.30))),
+        ]
+        _, (h_range, s_range, l_range) = self.rng.choices(
+            floor_families,
+            weights=[weight for weight, _ in floor_families],
+            k=1,
+        )[0]
+        hue = self.rng.uniform(*h_range) / 360.0
+        saturation = self.rng.uniform(*s_range)
+        lightness = self.rng.uniform(*l_range)
+        return colorsys.hls_to_rgb(hue, lightness, saturation)
 
     def _apply_floor_display_color(self, color: tuple[float, float, float]) -> None:
         from pxr import Gf, Usd, UsdGeom

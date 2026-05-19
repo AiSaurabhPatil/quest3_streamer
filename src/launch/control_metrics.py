@@ -6,7 +6,8 @@ from src.robot_adapters import OpenArmAdapter
 
 
 class ControlMetricsReporter:
-    def __init__(self, log_period_s: float = 3.0):
+    def __init__(self, log_period_s: float = 3.0, *, enabled: bool = True):
+        self.enabled = enabled
         self.log_period_s = max(0.5, float(log_period_s))
         self._last_log_s = time.monotonic()
         self._ready_frames = 0
@@ -21,6 +22,8 @@ class ControlMetricsReporter:
         self._last_right_step_limited = 0
 
     def record(self, session_update, adapter: OpenArmAdapter, logger) -> None:
+        if not self.enabled:
+            return
         self._ready_frames += 1
         if session_update.left_state.stale or session_update.right_state.stale:
             self._stale_frames += 1

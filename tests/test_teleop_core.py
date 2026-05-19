@@ -512,8 +512,8 @@ class AdapterConfigTests(unittest.TestCase):
                 "display_name": "AC One",
                 "usd": "assets/acone.usd",
                 "urdf": "assets/acone.urdf",
-                "left_arm_config": "acone_config/left_arm",
-                "right_arm_config": "acone_config/right_arm",
+                "left_arm_config": "robot_configs/acone_config/left_arm",
+                "right_arm_config": "robot_configs/acone_config/right_arm",
                 "left_arm": {
                     "frame_name": "left_link6",
                     "joints": [
@@ -579,8 +579,8 @@ class AdapterConfigTests(unittest.TestCase):
                 "robot_type": "acone",
                 "usd": "assets/acone.usd",
                 "urdf": "assets/acone.urdf",
-                "left_arm_config": "acone_config/left_arm",
-                "right_arm_config": "acone_config/right_arm",
+                "left_arm_config": "robot_configs/acone_config/left_arm",
+                "right_arm_config": "robot_configs/acone_config/right_arm",
                 "left_arm": {
                     "frame_name": "left_link6",
                     "joints": [
@@ -648,8 +648,8 @@ class AdapterConfigTests(unittest.TestCase):
                 "robot_type": "openarm",
                 "usd": "assets/openarm.usd",
                 "urdf": "assets/openarm.urdf",
-                "left_arm_config": "openarm_config/left_arm",
-                "right_arm_config": "openarm_config/right_arm",
+                "left_arm_config": "robot_configs/openarm_config/left_arm",
+                "right_arm_config": "robot_configs/openarm_config/right_arm",
                 "left_arm": {
                     "frame_name": "left_hand",
                     "joints": ["left_joint1", "left_joint2", "left_joint3"],
@@ -788,6 +788,73 @@ class IsaacBackendImportTests(unittest.TestCase):
         self.assertIs(CameraManagerConfig, CameraManagerConfig)
         self.assertIs(CameraImagePublishers, CameraImagePublishers)
         self.assertIs(JointStatePublisher, JointStatePublisher)
+
+    def test_isaac_app_does_not_forward_launcher_args_to_kit(self):
+        import types
+
+        captured_argv = []
+        enabled_extensions = []
+
+        class FakeSimulationApp:
+            def __init__(self, *_args, **_kwargs):
+                captured_argv.append(list(sys.argv))
+
+            def update(self):
+                pass
+
+            def set_setting(self, *_args):
+                pass
+
+            def close(self):
+                pass
+
+        omni_mod = types.ModuleType("omni")
+        isaac_mod = types.ModuleType("omni.isaac")
+        kit_mod = types.ModuleType("omni.isaac.kit")
+        core_mod = types.ModuleType("omni.isaac.core")
+        utils_mod = types.ModuleType("omni.isaac.core.utils")
+        extensions_mod = types.ModuleType("omni.isaac.core.utils.extensions")
+        kit_mod.SimulationApp = FakeSimulationApp
+        extensions_mod.enable_extension = enabled_extensions.append
+        omni_mod.isaac = isaac_mod
+        isaac_mod.kit = kit_mod
+        isaac_mod.core = core_mod
+        core_mod.utils = utils_mod
+        utils_mod.extensions = extensions_mod
+
+        module_names = (
+            "omni",
+            "omni.isaac",
+            "omni.isaac.kit",
+            "omni.isaac.core",
+            "omni.isaac.core.utils",
+            "omni.isaac.core.utils.extensions",
+        )
+        previous_modules = {name: sys.modules.get(name) for name in module_names}
+        original_argv = sys.argv
+        try:
+            for module in (
+                omni_mod,
+                isaac_mod,
+                kit_mod,
+                core_mod,
+                utils_mod,
+                extensions_mod,
+            ):
+                sys.modules[module.__name__] = module
+            sys.argv = ["teleop", "--config", "config.yaml", "--robot", "acone", "--webrtc"]
+            IsaacApp({"webrtc_streaming": True, "simulation": {"headless": True}}).start()
+        finally:
+            sys.argv = original_argv
+            for name, module in previous_modules.items():
+                if module is None:
+                    sys.modules.pop(name, None)
+                else:
+                    sys.modules[name] = module
+
+        self.assertEqual(captured_argv, [["teleop"]])
+        self.assertIn("omni.isaac.ros2_bridge", enabled_extensions)
+        self.assertIn("omni.services.livestream.nvcf", enabled_extensions)
 
 
 if __name__ == "__main__":

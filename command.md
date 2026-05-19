@@ -38,7 +38,7 @@ python3 -m src.launch.webxr_bridge \
 
 ```sh
 cd /home/saurabh/Development/quest3_streamer
-bash scripts/run_openarm_teleop.sh
+bash scripts/run_acone_teleop.sh
 ```
 
 #### Terminal 2 (Remote PC) for recording episode
@@ -50,7 +50,7 @@ source .venv-lerobot-v21/bin/activate
   --record \
   --dataset-root datasets \
   --dataset-repo-id local/quest3-acone \
-  --task "Teleoperate acone to complete the task" \
+  --task "sort nuts and bolts in different bins" \
   --recording-fps 30 \
   --max-episodes 10
 ```

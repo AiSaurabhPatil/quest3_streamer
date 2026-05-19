@@ -145,6 +145,10 @@ LEROBOT_RECORDING_PYTHON=$PWD/.venv-lerobot-v21/bin/python ./scripts/run_openarm
 Set `recording.dataset_format` to `v2.1`, `v3.0`, or `auto`. `auto` uses the
 format written by the selected LeRobot worker.
 
+Recorded camera videos default to 224x224 for pi0.5 training. The Isaac camera
+capture resolution defaults to the same size so the written videos match the
+LeRobot feature schema.
+
 The OpenArm teleop script also publishes data for external recording:
 
 | Topic | Type | Description |
@@ -155,6 +159,7 @@ The OpenArm teleop script also publishes data for external recording:
 | `/camera/wrist_right/image_raw` | `Image` | Right wrist camera |
 
 Camera images are published asynchronously at ~15 Hz to avoid performance impact.
+The default camera image size is 224x224 RGB.
 
 ---
 
@@ -214,7 +219,7 @@ buttons[3] = Thumbstick click
 | Topic | Type | Description |
 |-------|------|-------------|
 | `/joint_states` | `sensor_msgs/JointState` | Robot joint positions |
-| `/camera/head/image_raw` | `sensor_msgs/Image` | Head camera (480x360 RGB) |
+| `/camera/head/image_raw` | `sensor_msgs/Image` | Head camera (224x224 RGB by default) |
 | `/camera/wrist_left/image_raw` | `sensor_msgs/Image` | Left wrist camera |
 | `/camera/wrist_right/image_raw` | `sensor_msgs/Image` | Right wrist camera |
 
@@ -260,7 +265,7 @@ teleop:
 
 ### IK Configuration
 
-Each arm has its own IK configuration in `openarm_config/left_arm/` and `openarm_config/right_arm/`:
+Each arm has its own IK configuration in `robot_configs/openarm_config/left_arm/` and `robot_configs/openarm_config/right_arm/`:
 
 - `robot_descriptor.yaml` - Lula IK configuration
 - Joint limits, end-effector frame, etc.

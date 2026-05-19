@@ -64,7 +64,7 @@ class LeRobotWorkerProcess:
 
         dataset_root = Path(self._config.root) / self._config.repo_id
         if dataset_root.exists():
-            if _is_empty_v21_dataset_root(dataset_root, compat.dataset_format):
+            if _is_recreatable_empty_dataset_root(dataset_root, compat.dataset_format):
                 shutil.rmtree(dataset_root)
                 self._dataset = self._create_dataset(compat, dataset_root, robot_type)
                 return
@@ -284,7 +284,7 @@ def _read_dataset_format(dataset_root: Path) -> str:
     return "unknown"
 
 
-def _is_empty_v21_dataset_root(dataset_root: Path, expected_format: str) -> bool:
+def _is_recreatable_empty_dataset_root(dataset_root: Path, expected_format: str) -> bool:
     if expected_format != "v2.1" or _read_dataset_format(dataset_root) != "v2.1":
         return False
     try:
@@ -293,8 +293,10 @@ def _is_empty_v21_dataset_root(dataset_root: Path, expected_format: str) -> bool
         return False
     if int(info.get("total_episodes", 0)) != 0 or int(info.get("total_frames", 0)) != 0:
         return False
-    files = [path.relative_to(dataset_root) for path in dataset_root.rglob("*") if path.is_file()]
-    return files == [Path("meta/info.json")]
+    episode_artifacts = list((dataset_root / "data").rglob("*.parquet")) + list(
+        (dataset_root / "videos").rglob("*.mp4")
+    )
+    return not episode_artifacts
 
 
 def _required_dataset_paths(dataset_root: Path, dataset_format: str) -> tuple[Path, ...]:

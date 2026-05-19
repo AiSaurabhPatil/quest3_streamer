@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import sys
 
 
 DEFAULT_SIMULATION_CONFIG = {
@@ -28,6 +29,9 @@ DEFAULT_HIDDEN_WINDOWS = (
 @dataclass
 class IsaacAppConfig:
     simulation: dict = field(default_factory=lambda: dict(DEFAULT_SIMULATION_CONFIG))
+    experience: str | None = None
+    webrtc_streaming: bool = False
+    quiet_logging: bool = False
     warmup_updates: int = 30
     stage_stabilization_updates: int = 50
     world_stabilization_updates: int = 20
@@ -46,6 +50,9 @@ class IsaacAppConfig:
         hidden_windows = tuple(values.get("hidden_windows", DEFAULT_HIDDEN_WINDOWS))
         return cls(
             simulation=simulation,
+            experience=values.get("experience"),
+            webrtc_streaming=bool(values.get("webrtc_streaming", False)),
+            quiet_logging=bool(values.get("quiet_logging", False)),
             warmup_updates=int(values.get("warmup_updates", 30)),
             stage_stabilization_updates=int(values.get("stage_stabilization_updates", 50)),
             world_stabilization_updates=int(values.get("world_stabilization_updates", 20)),
@@ -76,11 +83,26 @@ class IsaacApp:
 
         from omni.isaac.kit import SimulationApp
 
-        self._simulation_app = SimulationApp(self.config.simulation)
+        original_argv = sys.argv
+        try:
+            sys.argv = [original_argv[0]]
+            self._simulation_app = SimulationApp(
+                self.config.simulation,
+                experience=self.config.experience or "",
+            )
+        finally:
+            sys.argv = original_argv
+        if self.config.quiet_logging:
+            import carb
+
+            carb.logging.acquire_logging().set_level_threshold(carb.logging.LEVEL_ERROR)
 
         from omni.isaac.core.utils.extensions import enable_extension
 
         enable_extension("omni.isaac.ros2_bridge")
+        if self.config.webrtc_streaming:
+            self._simulation_app.set_setting("/app/window/drawMouse", True)
+            enable_extension("omni.services.livestream.nvcf")
         self.warmup(self.config.warmup_updates)
         return self
 

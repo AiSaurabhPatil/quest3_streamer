@@ -11,7 +11,7 @@ import numpy as np
 @dataclass
 class CameraManagerConfig:
     enabled: bool = True
-    resolution: tuple[int, int] = (480, 360)
+    resolution: tuple[int, int] = (224, 224)
     publish_interval_frames: int = 2
     queue_size: int = 3
     log_errors: bool = True
@@ -20,7 +20,7 @@ class CameraManagerConfig:
     @classmethod
     def from_mapping(cls, values: dict | None):
         values = values or {}
-        resolution = values.get("resolution", (480, 360))
+        resolution = values.get("resolution", (224, 224))
         return cls(
             enabled=bool(values.get("enabled", True)),
             resolution=(int(resolution[0]), int(resolution[1])),

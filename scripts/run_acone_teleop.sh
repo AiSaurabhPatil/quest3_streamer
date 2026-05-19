@@ -20,6 +20,7 @@ config_value() {
 }
 
 ISAAC_SIM_PATH="${ISAAC_SIM_PATH:-$(config_value paths.isaac_sim)}"
+export ISAAC_SIM_PATH
 export LD_LIBRARY_PATH="${LD_LIBRARY_PATH:+$LD_LIBRARY_PATH:}$ISAAC_SIM_PATH/exts/isaacsim.ros2.bridge/humble/lib"
 
 recording_requested() {
@@ -93,5 +94,23 @@ echo "Starting AC One Bimanual Teleop..."
 echo "ROS_DISTRO: $ROS_DISTRO"
 echo "ISAAC_SIM_PATH: $ISAAC_SIM_PATH"
 
+has_webrtc_arg() {
+    local arg
+    for arg in "$@"; do
+        case "$arg" in
+            --webrtc|--no-webrtc)
+                return 0
+                ;;
+        esac
+    done
+    return 1
+}
+
+EXTRA_ARGS=()
+if ! has_webrtc_arg "$@"; then
+    EXTRA_ARGS+=(--webrtc)
+    echo "[WebRTC] Isaac Sim streaming enabled by default. Connect with Isaac Sim WebRTC client to this host on port 49100."
+fi
+
 cd "$PROJECT_ROOT"
-"$ISAAC_SIM_PATH/python.sh" -m src.launch.acone_teleop --config "$CONFIG_FILE" --robot acone "$@"
+"$ISAAC_SIM_PATH/python.sh" -m src.launch.acone_teleop --config "$CONFIG_FILE" --robot acone "${EXTRA_ARGS[@]}" "$@"
