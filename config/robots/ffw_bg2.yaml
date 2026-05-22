@@ -118,3 +118,36 @@ recording:
       name: "right_gripper"
       value: "normalized_gripper"
       side: "right"
+
+domain_randomization:
+  enabled: true
+  seed: null
+  settle_steps: 30
+  prims:
+    cube: "/World/Cube"
+    tray: "/World/Tray"
+    table: "/World/OakTableSmall"
+    light_root: "/Environment"
+  lighting:
+    distant_light_path: "/Environment/RandomizedDistantLight"
+    distant_light_base_intensity: 3500.0
+    distant_light_angle: 1.0
+    dome_light_intensity: 0.0
+    intensity: [1800.0, 6500.0]
+    exposure_jitter: [-0.1, 0.1]
+    direction_deg:
+      x: [35.0, 75.0]
+      y: [-25.0, 25.0]
+      z: [-180.0, 180.0]
+  placement:
+    table_center_area_scale: [0.6, 0.6]
+    boundary_margin_m: 0.025
+    object_gap_m: 0.035
+    cube_radius_m: 0.035
+    tray_radius_m: 0.16
+    min_center_distance_m: 0.22
+    cube_yaw_deg: [-180.0, 180.0]
+    tray_yaw_deg: [-20.0, 20.0]
+    fallback_table_bounds_m:
+      x: [-0.35, 0.35]
+      y: [-0.28, 0.28]

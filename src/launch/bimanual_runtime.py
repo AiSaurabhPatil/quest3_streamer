@@ -9,6 +9,7 @@ from src.isaac_backend import (
     CameraImagePublishers,
     CameraManager,
     DomainRandomizer,
+    FFWBG2DomainRandomizer,
     IsaacApp,
     JointStatePublisher,
 )
@@ -105,8 +106,14 @@ def run_bimanual_runtime(
             return 1
         print(f"[Init] Found robot at: {adapter.robot_prim_path}")
 
-        domain_randomizer = DomainRandomizer(world.stage, adapter.config.get("domain_randomization"))
+        randomizer_cls = (
+            FFWBG2DomainRandomizer
+            if adapter.config.get("robot_type") == "ffw_bg2"
+            else DomainRandomizer
+        )
+        domain_randomizer = randomizer_cls(world.stage, adapter.config.get("domain_randomization"))
         domain_randomizer.initialize()
+        print(f"[Init] Domain randomizer: {randomizer_cls.__name__} (enabled={domain_randomizer.enabled})")
 
         print("[Init] Loading IK Solvers...")
         ik_enabled = _initialize_ik(adapter)
@@ -605,11 +612,28 @@ def _reset_scene(
     if domain_randomizer is not None and domain_randomizer.enabled:
         sample = domain_randomizer.randomize(isaac_app.step)
         if verbose:
-            print(
-                "[Scene] Randomized: "
-                f"nuts={sample.nut_count}, bolts={sample.bolt_count}, "
-                f"light_intensity={sample.light_intensity}, floor_color={sample.floor_color}"
-            )
+            cube_pose = getattr(sample, "cube_pose", None)
+            tray_pose = getattr(sample, "tray_pose", None)
+            missing_prims = getattr(sample, "missing_prims", ())
+            if missing_prims:
+                print(
+                    "[Scene] Randomization skipped: "
+                    f"missing_prims={list(missing_prims)}, "
+                    f"light_intensity={sample.light_intensity}"
+                )
+            elif cube_pose is not None or tray_pose is not None:
+                print(
+                    "[Scene] Randomized: "
+                    f"cube_position={cube_pose[0] if cube_pose else None}, "
+                    f"tray_position={tray_pose[0] if tray_pose else None}, "
+                    f"light_intensity={sample.light_intensity}"
+                )
+            else:
+                print(
+                    "[Scene] Randomized: "
+                    f"nuts={sample.nut_count}, bolts={sample.bolt_count}, "
+                    f"light_intensity={sample.light_intensity}, floor_color={sample.floor_color}"
+                )
 
 
 def _handle_not_ready(
