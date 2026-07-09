@@ -160,7 +160,7 @@ Update `config/config.yaml` to be the source of truth:
 paths:
   isaac_sim: "/home/saurabh/isaac_sim"
   openarm:
-    usd: "robot_configs/openarm_config/openarm_bimanual/openarm_bimanual.usd"
+    usd: "robot_configs/openarm_config/openarm_bimanual/openarm_bimanual_env.usd"
     urdf: "robot_configs/openarm_config/openarm_bimanual_stl.urdf"
     left_arm_config: "robot_configs/openarm_config/left_arm"
     right_arm_config: "robot_configs/openarm_config/right_arm"
@@ -533,7 +533,7 @@ Suggested config:
 
 ```yaml
 robot_type: openarm
-usd: "robot_configs/openarm_config/openarm_bimanual/openarm_bimanual.usd"
+usd: "robot_configs/openarm_config/openarm_bimanual/openarm_bimanual_env.usd"
 urdf: "robot_configs/openarm_config/openarm_bimanual_stl.urdf"
 left_arm_config: "robot_configs/openarm_config/left_arm"
 right_arm_config: "robot_configs/openarm_config/right_arm"

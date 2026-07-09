@@ -7,6 +7,82 @@ import random
 from typing import Any
 
 
+def get_world_pose_usd(prim) -> tuple[list[float], list[float]]:
+    """Read a prim's world position and orientation directly from USD.
+
+    Uses pxr.UsdGeom.XformCache (a lightweight C++ object with no Python
+    ``__del__`` callback registration) instead of isaacsim's XFormPrim. The
+    throwaway ``XFormPrim(prim_path=...)`` instances used elsewhere trigger an
+    ``AttributeError: 'XFormPrim' object has no attribute '_callbacks'`` from
+    ``Prim.__del__`` when they are garbage-collected after a partially-failed
+    init (e.g. during shutdown / stage reload). The USD-native path has no such
+    object lifecycle and is the reliable way to read/write poses here.
+
+    Returns (position_xyz, orientation_wxyz). Orientation defaults to identity
+    if the prim has no meaningful rotation.
+    """
+    from pxr import UsdGeom
+
+    transform = UsdGeom.XformCache(0.0).GetLocalToWorldTransform(prim)
+    translation = transform.ExtractTranslation()
+    rotation = transform.ExtractRotationQuat()
+    imaginary = rotation.GetImaginary()
+    return (
+        [float(translation[0]), float(translation[1]), float(translation[2])],
+        [float(rotation.GetReal()), float(imaginary[0]), float(imaginary[1]), float(imaginary[2])],
+    )
+
+
+def set_world_pose_usd(prim, position, orientation_wxyz) -> None:
+    """Set a prim's world pose directly via USD.
+
+    Sets the prim's local transform so that its world transform matches the
+    requested position/orientation, assuming the prim's parent is at the world
+    origin (the common case for the top-level scene prims randomized here:
+    trays, lights, spawned objects under /World). Uses UsdGeom.XformCommonAPI
+    (no Python wrapper __del__). For prims with non-identity parent transforms
+    this sets the *local* pose; callers that need true world-space placement on
+    nested prims should re-parent or compute the relative transform.
+    """
+    from pxr import Gf, UsdGeom
+
+    api = UsdGeom.XformCommonAPI(prim)
+    api.SetTranslate(Gf.Vec3d(float(position[0]), float(position[1]), float(position[2])))
+    # XformCommonAPI.SetRotate expects XYZ euler degrees; convert from the
+    # quaternion. Falling back to identity on a degenerate quaternion.
+    roll, pitch, yaw = _quat_wxyz_to_euler_xyz_degrees(orientation_wxyz)
+    api.SetRotate((roll, pitch, yaw), UsdGeom.XformCommonAPI.RotationOrderXYZ)
+
+
+def _quat_wxyz_to_euler_xyz_degrees(quat_wxyz) -> tuple[float, float, float]:
+    """Convert a [w, x, y, z] quaternion to XYZ euler angles in degrees."""
+    qw, qx, qy, qz = [float(v) for v in quat_wxyz]
+    # Normalize to guard against degenerate input.
+    norm = math.sqrt(qw * qw + qx * qx + qy * qy + qz * qz)
+    if norm < 1e-12:
+        return 0.0, 0.0, 0.0
+    qw, qx, qy, qz = qw / norm, qx / norm, qy / norm, qz / norm
+    # Roll (x-axis rotation)
+    sinr_cosp = 2.0 * (qw * qx + qy * qz)
+    cosr_cosp = 1.0 - 2.0 * (qx * qx + qy * qy)
+    roll = math.atan2(sinr_cosp, cosr_cosp)
+    # Pitch (y-axis rotation)
+    sinp = 2.0 * (qw * qy - qz * qx)
+    if abs(sinp) >= 1.0:
+        pitch = math.copysign(math.pi / 2.0, sinp)
+    else:
+        pitch = math.asin(sinp)
+    # Yaw (z-axis rotation)
+    siny_cosp = 2.0 * (qw * qz + qx * qy)
+    cosy_cosp = 1.0 - 2.0 * (qy * qy + qz * qz)
+    yaw = math.atan2(siny_cosp, cosy_cosp)
+    return (
+        math.degrees(roll),
+        math.degrees(pitch),
+        math.degrees(yaw),
+    )
+
+
 @dataclass
 class DomainRandomizationSample:
     nut_count: int = 0
@@ -35,6 +111,24 @@ class DomainRandomizer:
         self._hide_original_objects()
 
     def randomize(self, settle_step) -> DomainRandomizationSample:
+        sample = self.apply_randomization()
+
+        for _ in range(max(0, int(self.config.get("settle_steps", 90)))):
+            settle_step(render=True)
+        return sample
+
+    def apply_randomization(self) -> DomainRandomizationSample:
+        """Mutate the USD stage for a new random sample without stepping physics.
+
+        This performs all prim additions/removals/edits (clearing spawned
+        objects, lighting/floor changes, tray jitter, spawning nuts/bolts) and
+        returns the sample descriptor. It must be called while physics is
+        STOPPED so that PhysX rebuilds a consistent scene on the next
+        play()/reset() -- mutating physics-enabled prims while the simulation
+        is running leaves existing articulation tensor views stale or corrupt,
+        which silently freezes teleop. Settle-stepping (which needs physics
+        running) is left to the caller via ``settle`` or ``randomize``.
+        """
         sample = DomainRandomizationSample()
         if not self.enabled:
             return sample
@@ -45,10 +139,18 @@ class DomainRandomizer:
         sample.floor_color = self._randomize_floor()
         self._randomize_trays()
         sample.nut_count, sample.bolt_count = self._spawn_objects()
+        return sample
 
+    def settle(self, settle_step) -> None:
+        """Step physics so newly spawned objects fall/settle into place.
+
+        Must be called AFTER the simulation has been restarted (play/reset) so
+        the spawned bodies exist in the PhysX scene.
+        """
+        if not self.enabled:
+            return
         for _ in range(max(0, int(self.config.get("settle_steps", 90)))):
             settle_step(render=True)
-        return sample
 
     def _tray_paths(self) -> list[str]:
         prims = self.config.get("prims", {})
@@ -74,40 +176,12 @@ class DomainRandomizer:
         api.SetTranslate(tuple(float(v) for v in translate))
         api.SetRotate(tuple(float(v) for v in rotate), UsdGeom.XformCommonAPI.RotationOrderXYZ)
         api.SetScale(tuple(float(v) for v in scale))
-        try:
-            import numpy as np
-            from omni.isaac.core.prims import XFormPrim
-
-            XFormPrim(prim_path=str(prim.GetPath())).set_world_pose(
-                position=np.asarray(translate, dtype=float),
-                orientation=np.asarray(_euler_xyz_degrees_to_quat_wxyz(rotate), dtype=float),
-            )
-        except Exception:
-            pass
 
     def _get_world_pose(self, prim) -> tuple[list[float], list[float]]:
-        try:
-            from omni.isaac.core.prims import XFormPrim
-
-            position, orientation = XFormPrim(prim_path=str(prim.GetPath())).get_world_pose()
-            return list(position), list(orientation)
-        except Exception:
-            from pxr import UsdGeom
-
-            transform = UsdGeom.XformCache(0.0).GetLocalToWorldTransform(prim)
-            return list(transform.ExtractTranslation()), [1.0, 0.0, 0.0, 0.0]
+        return get_world_pose_usd(prim)
 
     def _set_world_pose(self, prim, position, orientation) -> None:
-        try:
-            import numpy as np
-            from omni.isaac.core.prims import XFormPrim
-
-            XFormPrim(prim_path=str(prim.GetPath())).set_world_pose(
-                position=np.asarray(position, dtype=float),
-                orientation=np.asarray(orientation, dtype=float),
-            )
-        except Exception:
-            pass
+        set_world_pose_usd(prim, position, orientation)
 
     def _restore_trays(self) -> None:
         for path, (position, orientation) in self._tray_base_poses.items():
@@ -303,17 +377,7 @@ class DomainRandomizer:
         api = UsdGeom.XformCommonAPI(prim)
         api.SetTranslate(Gf.Vec3d(x, y, z))
         api.SetRotate((0.0, 0.0, yaw), UsdGeom.XformCommonAPI.RotationOrderXYZ)
-        api.SetScale(object_scale)
-        try:
-            import numpy as np
-            from omni.isaac.core.prims import XFormPrim
-
-            XFormPrim(prim_path=prim_path).set_world_pose(
-                position=np.asarray([x, y, z], dtype=float),
-                orientation=np.asarray(_euler_xyz_degrees_to_quat_wxyz((0.0, 0.0, yaw)), dtype=float),
-            )
-        except Exception:
-            pass
+        api.SetScale(Gf.Vec3f(float(object_scale[0]), float(object_scale[1]), float(object_scale[2])))
 
     def _object_scale(self, kind: str) -> tuple[float, float, float]:
         objects = self.config.get("objects", {})

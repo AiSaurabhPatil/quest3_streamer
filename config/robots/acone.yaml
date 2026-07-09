@@ -1,7 +1,7 @@
 robot_type: acone
 display_name: "AC One"
 articulation_name: "acone"
-usd: "/home/saurabh/Development/ARX_Model/AC one/acone_scene.usd"
+usd: "robot_configs/acone_config/acone_scene_v2.usd"
 urdf: "robot_configs/acone_config/urdf/acone_with_tcp.urdf"
 left_arm_config: "robot_configs/acone_config/left_arm"
 right_arm_config: "robot_configs/acone_config/right_arm"
@@ -39,9 +39,9 @@ right_arm:
   home_orientation: [1.0, 0.0, 0.0, 0.0]
 
 grippers:
-  open_position: 0.06
+  open_position: 0.02
   closed_position: 0.0
-  speed: 1
+  speed: 0.02
   threshold: 0.5
   left_joints:
     - "left_joint7"
@@ -52,13 +52,13 @@ grippers:
 
 cameras:
   head_camera:
-    prim_path: "/World/ACone/base_link/head_camera"
+    prim_path: "/World/ACone/Geometry/base_link/head_camera"
     topic: "/camera/head_camera/image_raw"
   left_wrist_camera:
-    prim_path: "/World/ACone/left_link6/left_wrist_camera"
+    prim_path: "/World/ACone/Geometry/base_link/left_link1/left_link2/left_link3/left_link4/left_link5/left_link6/left_wrist_camera"
     topic: "/camera/left_wrist_camera/image_raw"
   right_wrist_camera:
-    prim_path: "/World/ACone/right_link16/right_wrist_camera"
+    prim_path: "/World/ACone/Geometry/base_link/right_link11/right_link12/right_link13/right_link14/right_link15/right_link16/right_wrist_camera"
     topic: "/camera/right_wrist_camera/image_raw"
 
 ik:
@@ -68,8 +68,8 @@ ik:
   orientation_fallback_to_position: true
 
 teleop:
-  workspace_center: [0.2097, 0.0186, 0.2620]
-  position_scale: [1.0, 1.0, 1.0]
+  # workspace_center: [0.2097, 0.0186, 0.2620]
+  # position_scale: [1.0, 1.0, 1.0]
   calibration_samples: 30
   deadman_timeout_ms: 500
   hard_timeout_ms: 1000
@@ -123,8 +123,8 @@ domain_randomization:
     bolt: "/World/bolt"
     spawn_root: "/World/RandomizedObjects"
   assets:
-    nut_usd: "/home/saurabh/Development/ARX_Model/AC one/nut.usd"
-    bolt_usd: "/home/saurabh/Development/ARX_Model/AC one/bolt.usd"
+    nut_usd: "robot_configs/acone_config/nut.usd"
+    bolt_usd: "robot_configs/acone_config/bolt.usd"
   lighting:
     intensity: [300, 1800]
     exposure: [-1.0, 1.0]

@@ -20,7 +20,7 @@ class ConfigLoaderTests(unittest.TestCase):
         self.assertTrue(os.path.isabs(runtime.main["paths"]["isaac_sim"]))
         self.assertTrue(os.path.isabs(runtime.main["paths"]["certs"]["cert"]))
         self.assertTrue(os.path.isabs(runtime.robot["usd"]))
-        self.assertTrue(runtime.robot["usd"].endswith("openarm_bimanual.usd"))
+        self.assertTrue(runtime.robot["usd"].endswith("openarm_bimanual_env.usd"))
 
     def test_loader_supports_active_robot_selection_from_main_config(self):
         with tempfile.TemporaryDirectory() as tmpdir:

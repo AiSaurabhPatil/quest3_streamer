@@ -219,7 +219,7 @@ def _enable_webrtc_streaming(isaac_config: dict) -> None:
     extra_args = list(simulation.get("extra_args", []))
     for arg in (
         "--/app/window/drawMouse=true",
-        "--/app/livestream/nvcf/quitOnSessionEnded=false",
+        "--/app/livestream/quitOnSessionEnded=false",
         "--/renderer/multiGpu/enabled=false",
         "--/renderer/multiGpu/maxGpuCount=1",
     ):

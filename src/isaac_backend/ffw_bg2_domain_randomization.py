@@ -35,15 +35,19 @@ class FFWBG2DomainRandomizer(DomainRandomizer):
         self._capture_light_baselines()
 
     def randomize(self, settle_step) -> FFWBG2DomainRandomizationSample:
+        sample = self.apply_randomization()
+
+        for _ in range(max(0, int(self.config.get("settle_steps", 30)))):
+            settle_step(render=True)
+        return sample
+
+    def apply_randomization(self) -> FFWBG2DomainRandomizationSample:
         sample = FFWBG2DomainRandomizationSample()
         if not self.enabled:
             return sample
 
         sample.light_intensity = self._randomize_lighting()
         sample.tray_pose, sample.cube_pose, sample.missing_prims = self._randomize_cube_and_tray()
-
-        for _ in range(max(0, int(self.config.get("settle_steps", 30)))):
-            settle_step(render=True)
         return sample
 
     def _cube_path(self) -> str:

@@ -1,3 +1,5 @@
+import math
+
 import numpy as np
 
 
@@ -34,9 +36,30 @@ def slerp_quat_wxyz(q_current, q_target, alpha):
 
 
 class PositionEMA:
-    def __init__(self, alpha: float):
-        self.alpha = float(np.clip(alpha, 0.0, 1.0))
+    """Exponential moving average for 3D positions.
+
+    Operates in one of two modes:
+      - Time-constant mode (preferred): pass tau_s. The per-step coefficient is
+        computed from the actual loop dt as alpha = exp(-dt / tau), so the
+        smoothing *feel* is independent of the control-loop rate. This matters
+        once physics is decoupled from rendering and the loop rate changes.
+      - Per-step mode (legacy): pass alpha directly (0..1). Reproduces the old
+        behavior but the effective smoothing changes with loop rate.
+    """
+
+    def __init__(self, alpha: float | None = None, tau_s: float | None = None):
+        self.alpha = float(np.clip(alpha, 0.0, 1.0)) if alpha is not None else None
+        self.tau_s = max(1e-6, float(tau_s)) if tau_s is not None else None
         self._value: np.ndarray | None = None
+
+    def _coefficient(self, dt_s: float | None) -> float:
+        """Return the 'keep previous' weight for this step."""
+        if self.tau_s is not None and dt_s is not None and dt_s > 0.0:
+            return float(math.exp(-dt_s / self.tau_s))
+        if self.alpha is not None:
+            return self.alpha
+        # No smoothing configured.
+        return 0.0
 
     @property
     def value(self) -> np.ndarray | None:
@@ -47,19 +70,36 @@ class PositionEMA:
     def reset(self, value: np.ndarray | None = None) -> None:
         self._value = None if value is None else np.asarray(value, dtype=float).reshape(3).copy()
 
-    def update(self, target: np.ndarray) -> np.ndarray:
+    def update(self, target: np.ndarray, dt_s: float | None = None) -> np.ndarray:
         target = np.asarray(target, dtype=float).reshape(3)
         if self._value is None:
             self._value = target.copy()
         else:
-            self._value = self.alpha * self._value + (1.0 - self.alpha) * target
+            alpha = self._coefficient(dt_s)
+            self._value = alpha * self._value + (1.0 - alpha) * target
         return self._value.copy()
 
 
 class OrientationSlerp:
-    def __init__(self, alpha: float):
-        self.alpha = float(np.clip(alpha, 0.0, 1.0))
+    """Spherical-linear smoothing for orientations (quaternions, wxyz).
+
+    Same dual-mode design as PositionEMA: time-constant mode (tau_s, preferred)
+    keeps the feel stable across loop-rate changes; per-step alpha (legacy) is
+    supported for backward compatibility.
+    """
+
+    def __init__(self, alpha: float | None = None, tau_s: float | None = None):
+        self.alpha = float(np.clip(alpha, 0.0, 1.0)) if alpha is not None else None
+        self.tau_s = max(1e-6, float(tau_s)) if tau_s is not None else None
         self._value: np.ndarray | None = None
+
+    def _coefficient(self, dt_s: float | None) -> float:
+        """Return the 'keep previous' weight for this step."""
+        if self.tau_s is not None and dt_s is not None and dt_s > 0.0:
+            return float(math.exp(-dt_s / self.tau_s))
+        if self.alpha is not None:
+            return self.alpha
+        return 0.0
 
     @property
     def value(self) -> np.ndarray | None:
@@ -70,12 +110,13 @@ class OrientationSlerp:
     def reset(self, value: np.ndarray | None = None) -> None:
         self._value = None if value is None else _normalized_quat_wxyz(value)
 
-    def update(self, target_wxyz: np.ndarray) -> np.ndarray:
+    def update(self, target_wxyz: np.ndarray, dt_s: float | None = None) -> np.ndarray:
         target_wxyz = _normalized_quat_wxyz(target_wxyz)
         if self._value is None:
             self._value = target_wxyz.copy()
         else:
-            self._value = slerp_quat_wxyz(self._value, target_wxyz, 1.0 - self.alpha)
+            alpha = self._coefficient(dt_s)
+            self._value = slerp_quat_wxyz(self._value, target_wxyz, 1.0 - alpha)
         return self._value.copy()
 
 

@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import argparse
 
+import os
+
 from src.config_loader import default_project_root, load_runtime_config
+from src.launch.acone_teleop import _enable_webrtc_streaming
 from src.launch.bimanual_runtime import run_bimanual_runtime
 from src.robot_adapters import OpenArmAdapter
 from src.teleop_core import TeleopSessionConfig
@@ -18,6 +21,10 @@ def build_runtime_config(
 ) -> TeleopSessionConfig:
     smoothing = settings.get("smoothing", {})
     transport_settings = transport_settings or {}
+    # Prefer the rate-invariant time-constant form (position_tau_s /
+    # orientation_tau_s) when configured; fall back to the legacy per-step alpha.
+    position_tau_s = _optional_tau(smoothing.get("position_tau_s"))
+    orientation_tau_s = _optional_tau(smoothing.get("orientation_tau_s"))
     return TeleopSessionConfig(
         pos_scale=settings.get("position_scale", [1.0, 1.0, 1.0]),
         robot_workspace_center=settings.get("workspace_center", [0.3, 0.0, 0.3]),
@@ -31,8 +38,10 @@ def build_runtime_config(
             "home_orientation",
             [1.0, 0.0, 0.0, 0.0],
         ),
-        position_alpha=smoothing.get("position_alpha", 0.9),
-        orientation_alpha=smoothing.get("orientation_alpha", 0.9),
+        position_alpha=smoothing.get("position_alpha", 0.9) if position_tau_s is None else None,
+        orientation_alpha=smoothing.get("orientation_alpha", 0.9) if orientation_tau_s is None else None,
+        position_tau_s=position_tau_s,
+        orientation_tau_s=orientation_tau_s,
         gripper_threshold=adapter.gripper_threshold,
         calibration_samples=settings.get("calibration_samples", 30),
         deadman_timeout_s=settings.get("deadman_timeout_ms", 500) / 1000.0,
@@ -42,7 +51,14 @@ def build_runtime_config(
         enable_prediction=bool(transport_settings.get("enable_prediction", False)),
         prediction_horizon_s=transport_settings.get("prediction_horizon_ms", 50) / 1000.0,
         jitter_buffer_frames=transport_settings.get("jitter_buffer_frames", 0),
+        stale_recovery_alpha=settings.get("stale_recovery_alpha", 0.5),
     )
+
+
+def _optional_tau(value) -> float | None:
+    if value is None or value == "":
+        return None
+    return float(value)
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
@@ -57,6 +73,17 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--headless",
         action="store_true",
         help="Force Isaac Sim to run headless",
+    )
+    webrtc_group = parser.add_mutually_exclusive_group()
+    webrtc_group.add_argument(
+        "--webrtc",
+        action="store_true",
+        help="Run Isaac Sim in WebRTC streaming mode",
+    )
+    webrtc_group.add_argument(
+        "--no-webrtc",
+        action="store_true",
+        help="Disable WebRTC streaming mode",
     )
     parser.add_argument(
         "--disable-cameras",
@@ -113,6 +140,8 @@ def resolve_runtime_settings(args: argparse.Namespace) -> tuple[object, dict, di
         project_root=PROJECT_ROOT,
     )
     isaac_config = dict(runtime.main.get("isaac", {}))
+    if getattr(args, "webrtc", False):
+        _enable_webrtc_streaming(isaac_config)
     if args.headless:
         isaac_config["headless"] = True
         simulation = dict(isaac_config.get("simulation", {}))

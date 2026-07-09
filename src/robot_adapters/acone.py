@@ -10,42 +10,43 @@ class AconeAdapter(OpenArmAdapter):
 
     def __init__(self, config: dict, project_root: str):
         super().__init__(config, project_root)
-        self.ik_config = dict(self.config.get("ik", {}))
-        self.orientation_mode = str(
-            self.ik_config.get("orientation_mode", "position_only")
-        ).strip()
-        self.position_tolerance = _optional_float(self.ik_config.get("position_tolerance"))
-        self.orientation_tolerance = _optional_float(self.ik_config.get("orientation_tolerance"))
-        self.orientation_fallback_to_position = bool(
-            self.ik_config.get("orientation_fallback_to_position", True)
-        )
-        self._diagnostics.details["orientation_mode"] = self.orientation_mode
-        self._diagnostics.details["orientation_fallback_to_position"] = (
-            self.orientation_fallback_to_position
-        )
-        self._diagnostics.counters.update(
-            {
-                "left_orientation_fallback": 0,
-                "right_orientation_fallback": 0,
-            }
-        )
+        # IK config (ik_config, orientation_mode, tolerances, fallback) is now
+        # parsed by the OpenArmAdapter base. Acone historically defaulted to
+        # position-only IK, so preserve that default when the config omits an
+        # explicit orientation_mode.
+        if "orientation_mode" not in self.ik_config:
+            self.orientation_mode = "position_only"
+            self._diagnostics.details["orientation_mode"] = self.orientation_mode
+        # orientation_fallback_to_position defaults to True for Acone (the base
+        # default is False) so a full-pose miss degrades to position-only.
+        if "orientation_fallback_to_position" not in self.ik_config:
+            self.orientation_fallback_to_position = True
+            self._diagnostics.details["orientation_fallback_to_position"] = True
 
     def initialize_joint_mappings(self) -> None:
         super().initialize_joint_mappings()
         self._apply_gripper_drive_overrides()
 
-    def _apply_arm_ik(
+    def _solve_arm_ik(
         self,
         solver,
         runtime,
         indices: list[int],
         ee_target,
-        target_positions: np.ndarray,
-        success_key: str,
-        fail_key: str,
-    ) -> None:
+    ):
+        """Acone-specific IK worker: tries full pose IK, then falls back to
+        position-only if configured. Thread-safe pure result; counters and the
+        shared command vector are updated on the control thread by _scatter_arm.
+        """
         if solver is None or not ee_target.valid:
-            return
+            return self._ArmIKResult(
+                success=False,
+                step_limited=False,
+                arm_positions=None,
+                fallback=runtime.last_arm_positions,
+                indices=list(indices),
+                orientation_fallback=False,
+            )
 
         warm_start = (
             runtime.last_arm_positions
@@ -61,6 +62,7 @@ class AconeAdapter(OpenArmAdapter):
             warm_start=warm_start,
             orientation=orientation,
         )
+        orientation_fallback = False
         if not success and orientation is not None and self.orientation_fallback_to_position:
             actions, success = self._compute_ik(
                 solver=solver,
@@ -69,31 +71,32 @@ class AconeAdapter(OpenArmAdapter):
                 warm_start=warm_start,
                 orientation=None,
             )
-            if success:
-                self._diagnostics.counters[
-                    success_key.replace("_ik_success", "_orientation_fallback")
-                ] += 1
+            orientation_fallback = success
 
-        if success:
-            self._diagnostics.counters[success_key] += 1
-            arm_positions = np.asarray(actions, dtype=float).reshape(-1)[: len(indices)]
-            arm_positions = self._limit_arm_step(
-                runtime=runtime,
-                arm_positions=arm_positions,
-                limit_key=success_key.replace("_ik_success", "_ik_step_limited"),
+        if not success:
+            return self._ArmIKResult(
+                success=False,
+                step_limited=False,
+                arm_positions=None,
+                fallback=runtime.last_arm_positions,
+                indices=list(indices),
+                orientation_fallback=False,
             )
-            runtime.last_arm_positions = arm_positions.copy()
-            for offset, joint_index in enumerate(indices):
-                if offset < arm_positions.size:
-                    target_positions[joint_index] = arm_positions[offset]
-            return
 
-        self._diagnostics.counters[fail_key] += 1
-        if runtime.last_arm_positions is None:
-            return
-        for offset, joint_index in enumerate(indices):
-            if offset < runtime.last_arm_positions.size:
-                target_positions[joint_index] = runtime.last_arm_positions[offset]
+        arm_positions = np.asarray(actions, dtype=float).reshape(-1)[: len(indices)]
+        limited, step_limited = self._limit_arm_step_pure(
+            runtime=runtime,
+            arm_positions=arm_positions,
+        )
+        runtime.last_arm_positions = limited.copy()
+        return self._ArmIKResult(
+            success=True,
+            step_limited=step_limited,
+            arm_positions=limited,
+            fallback=None,
+            indices=list(indices),
+            orientation_fallback=orientation_fallback,
+        )
 
     def _compute_ik(self, *, solver, runtime, ee_target, warm_start, orientation):
         return solver.compute_inverse_kinematics(
@@ -135,9 +138,3 @@ class AconeAdapter(OpenArmAdapter):
                 drive.CreateDampingAttr(float(drive_config["damping"]))
             if "max_force" in drive_config:
                 drive.CreateMaxForceAttr(float(drive_config["max_force"]))
-
-
-def _optional_float(value) -> float | None:
-    if value in (None, ""):
-        return None
-    return float(value)

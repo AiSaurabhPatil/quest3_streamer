@@ -621,7 +621,7 @@ class AdapterConfigTests(unittest.TestCase):
         )
         solver = FallbackSolver()
         target_positions = np.zeros(6, dtype=float)
-        adapter._apply_arm_ik(
+        result = adapter._solve_arm_ik(
             solver=solver,
             runtime=adapter.left_runtime,
             indices=[0, 1, 2, 3, 4, 5],
@@ -629,9 +629,14 @@ class AdapterConfigTests(unittest.TestCase):
                 position_xyz=[0.1, 0.2, 0.3],
                 orientation_wxyz=[0.0, 1.0, 0.0, 0.0],
             ),
-            target_positions=target_positions,
+        )
+        adapter._scatter_arm(
+            result=result,
+            indices=[0, 1, 2, 3, 4, 5],
             success_key="left_ik_success",
             fail_key="left_ik_fail",
+            step_limit_key="left_ik_step_limited",
+            target_positions=target_positions,
         )
 
         self.assertEqual(len(solver.orientations), 2)
@@ -673,23 +678,338 @@ class AdapterConfigTests(unittest.TestCase):
         )
         adapter.left_runtime.last_arm_positions = np.zeros(3, dtype=float)
 
-        limited = adapter._limit_arm_step(
+        limited, step_limited = adapter._limit_arm_step_pure(
             runtime=adapter.left_runtime,
             arm_positions=np.array([1.0, -1.0, 0.02]),
-            limit_key="left_ik_step_limited",
         )
 
         np.testing.assert_allclose(limited, [0.05, -0.05, 0.02])
-        self.assertEqual(adapter.get_diagnostics().counters["left_ik_step_limited"], 1)
+        self.assertTrue(step_limited)
+        # _limit_arm_step_pure does not touch counters; the caller (_scatter_arm)
+        # is responsible for that. Verify it remained untouched.
+        self.assertEqual(adapter.get_diagnostics().counters.get("left_ik_step_limited", 0), 0)
 
     def test_openarm_adapter_loads_yaml_without_isaac_imports(self):
         adapter = OpenArmAdapter.from_yaml(
             os.path.join(PROJECT_ROOT, "config", "robots", "openarm.yaml"),
             project_root=PROJECT_ROOT,
         )
-        self.assertTrue(adapter.usd_path.endswith("openarm_bimanual.usd"))
+        self.assertTrue(adapter.usd_path.endswith("openarm_bimanual_env.usd"))
         self.assertGreaterEqual(len(adapter.get_camera_specs()), 3)
         np.testing.assert_allclose(adapter.left_workspace_offset, [0.0, 0.15, 0.0])
+
+    def test_openarm_yaml_enables_solver_base_pose_and_ik_fallback(self):
+        # Regression guard for the OpenArm IK failure: the shipped config must
+        # opt into set_solver_base_pose_from_stage (the robot lives under
+        # /World/Robot, not at the stage origin) and configure an orientation
+        # fallback so full-pose misses degrade to position-only.
+        adapter = OpenArmAdapter.from_yaml(
+            os.path.join(PROJECT_ROOT, "config", "robots", "openarm.yaml"),
+            project_root=PROJECT_ROOT,
+        )
+        self.assertTrue(adapter.ik_config.get("set_solver_base_pose_from_stage"))
+        self.assertTrue(adapter.orientation_fallback_to_position)
+        self.assertAlmostEqual(adapter.position_tolerance, 0.003)
+        self.assertEqual(adapter.orientation_mode, "full_pose")
+
+    def test_openarm_adapter_applies_solver_base_pose_from_stage(self):
+        # The base-pose fix must call set_robot_base_pose on both solvers with
+        # the transform read from the USD stage, and must not raise when the
+        # stage transform cannot be read (graceful degradation).
+        captured = []
+
+        class FakeSolver:
+            def set_robot_base_pose(self, position, orientation):
+                captured.append((np.asarray(position).copy(), np.asarray(orientation).copy()))
+
+        adapter = OpenArmAdapter.from_mapping(
+            {
+                "robot_type": "openarm",
+                "usd": "assets/openarm.usd",
+                "urdf": "assets/openarm.urdf",
+                "left_arm_config": "robot_configs/openarm_config/left_arm",
+                "right_arm_config": "robot_configs/openarm_config/right_arm",
+                "left_arm": {
+                    "frame_name": "left_hand",
+                    "joints": ["left_joint1", "left_joint2", "left_joint3"],
+                    "preferred_config": [0.0, 0.0, 0.0],
+                },
+                "right_arm": {
+                    "frame_name": "right_hand",
+                    "joints": ["right_joint1", "right_joint2", "right_joint3"],
+                    "preferred_config": [0.0, 0.0, 0.0],
+                },
+                "grippers": {
+                    "open_position": 0.044,
+                    "closed_position": 0.0,
+                    "speed": 0.003,
+                    "left_joints": ["left_finger1"],
+                    "right_joints": ["right_finger1"],
+                },
+                "ik": {"set_solver_base_pose_from_stage": True},
+            },
+            project_root=PROJECT_ROOT,
+        )
+        adapter.left_ik_solver = FakeSolver()
+        adapter.right_ik_solver = FakeSolver()
+        # No articulation loaded yet -> graceful degradation, no exception.
+        adapter._apply_solver_base_pose_from_stage()
+        self.assertEqual(captured, [])
+        self.assertIn("solver_base_pose_error", adapter.get_diagnostics().details)
+
+    def test_openarm_joint_read_survives_invalidated_physics_view(self):
+        # Regression for the domain-randomization crash: spawning/removing
+        # physics prims while the sim is running makes Isaac Sim 6.0 *delete*
+        # the deprecated Articulation's `_physics_view` attribute, so the next
+        # get_joint_positions() raises AttributeError from is_physics_handle_valid.
+        # get_current_joint_positions must swallow that and return None so the
+        # control loop skips the frame instead of crashing.
+        class ArticulationWithDeletedView:
+            def get_joint_positions(self):
+                # Mirrors the real failure: the attribute is gone, not None.
+                raise AttributeError("_physics_view")
+
+        adapter = OpenArmAdapter.from_mapping(
+            {
+                "robot_type": "openarm",
+                "usd": "assets/openarm.usd",
+                "urdf": "assets/openarm.urdf",
+                "left_arm_config": "robot_configs/openarm_config/left_arm",
+                "right_arm_config": "robot_configs/openarm_config/right_arm",
+                "left_arm": {
+                    "frame_name": "left_hand",
+                    "joints": ["left_joint1"],
+                    "preferred_config": [0.0],
+                },
+                "right_arm": {
+                    "frame_name": "right_hand",
+                    "joints": ["right_joint1"],
+                    "preferred_config": [0.0],
+                },
+                "grippers": {
+                    "open_position": 0.044,
+                    "closed_position": 0.0,
+                    "speed": 0.003,
+                    "left_joints": ["left_finger1"],
+                    "right_joints": ["right_finger1"],
+                },
+            },
+            project_root=PROJECT_ROOT,
+        )
+        adapter.articulation = ArticulationWithDeletedView()
+        # Must not raise; the control loop treats None as "skip this frame".
+        self.assertIsNone(adapter.get_current_joint_positions())
+
+    def test_openarm_reinitialize_physics_handles_rebuilds_view(self):
+        # After a scene reset the articulation's tensor view must be rebuilt via
+        # initialize(); reinitialize_physics_handles() should drive that and
+        # report validity. It must also degrade gracefully (return False) when
+        # initialize() itself raises, never propagating the exception.
+        class ReinitArticulation:
+            def __init__(self):
+                self.initialized = False
+                self.valid = False
+
+            def initialize(self):
+                self.initialized = True
+                self.valid = True
+
+            def is_physics_handle_valid(self):
+                return self.valid
+
+        adapter = OpenArmAdapter.from_mapping(
+            {
+                "robot_type": "openarm",
+                "usd": "assets/openarm.usd",
+                "urdf": "assets/openarm.urdf",
+                "left_arm_config": "robot_configs/openarm_config/left_arm",
+                "right_arm_config": "robot_configs/openarm_config/right_arm",
+                "left_arm": {
+                    "frame_name": "left_hand",
+                    "joints": ["left_joint1"],
+                    "preferred_config": [0.0],
+                },
+                "right_arm": {
+                    "frame_name": "right_hand",
+                    "joints": ["right_joint1"],
+                    "preferred_config": [0.0],
+                },
+                "grippers": {
+                    "open_position": 0.044,
+                    "closed_position": 0.0,
+                    "speed": 0.003,
+                    "left_joints": ["left_finger1"],
+                    "right_joints": ["right_finger1"],
+                },
+            },
+            project_root=PROJECT_ROOT,
+        )
+        articulation = ReinitArticulation()
+        adapter.articulation = articulation
+        self.assertTrue(adapter.reinitialize_physics_handles())
+        self.assertTrue(articulation.initialized)
+
+        # No articulation -> False, no exception.
+        adapter.articulation = None
+        self.assertFalse(adapter.reinitialize_physics_handles())
+
+    def test_openarm_adapter_ik_uses_config_tolerances_and_orientation_fallback(self):
+        # OpenArmAdapter (not just AconeAdapter) must honor the ik config block:
+        # pass configured tolerances and retry position-only on a full-pose miss.
+        class SequenceSolver:
+            def __init__(self):
+                self.calls = []
+
+            def compute_inverse_kinematics(self, **kwargs):
+                self.calls.append(kwargs)
+                # First call (full pose) fails; second (position-only) succeeds.
+                success = kwargs["target_orientation"] is None
+                return np.arange(3, dtype=float), success
+
+        adapter = OpenArmAdapter.from_mapping(
+            {
+                "robot_type": "openarm",
+                "usd": "assets/openarm.usd",
+                "urdf": "assets/openarm.urdf",
+                "left_arm_config": "robot_configs/openarm_config/left_arm",
+                "right_arm_config": "robot_configs/openarm_config/right_arm",
+                "left_arm": {
+                    "frame_name": "left_hand",
+                    "joints": ["left_joint1", "left_joint2", "left_joint3"],
+                    "preferred_config": [0.0, 0.0, 0.0],
+                },
+                "right_arm": {
+                    "frame_name": "right_hand",
+                    "joints": ["right_joint1", "right_joint2", "right_joint3"],
+                    "preferred_config": [0.0, 0.0, 0.0],
+                },
+                "grippers": {
+                    "open_position": 0.044,
+                    "closed_position": 0.0,
+                    "speed": 0.003,
+                    "left_joints": ["left_finger1"],
+                    "right_joints": ["right_finger1"],
+                },
+                "ik": {
+                    "orientation_mode": "full_pose",
+                    "position_tolerance": 0.005,
+                    "orientation_tolerance": 0.3,
+                    "orientation_fallback_to_position": True,
+                },
+            },
+            project_root=PROJECT_ROOT,
+        )
+        solver = SequenceSolver()
+        result = adapter._solve_arm_ik(
+            solver=solver,
+            runtime=adapter.left_runtime,
+            indices=[0, 1, 2],
+            ee_target=EndEffectorTarget(
+                position_xyz=[0.1, 0.2, 0.3],
+                orientation_wxyz=[0.0, 1.0, 0.0, 0.0],
+            ),
+        )
+        self.assertTrue(result.success)
+        self.assertTrue(result.orientation_fallback)
+        self.assertEqual(len(solver.calls), 2)
+        self.assertAlmostEqual(solver.calls[0]["position_tolerance"], 0.005)
+        self.assertAlmostEqual(solver.calls[0]["orientation_tolerance"], 0.3)
+        self.assertIsNone(solver.calls[1]["target_orientation"])
+
+    def test_openarm_adapter_derives_home_pose_from_forward_kinematics(self):
+        # The FK-based home pose is what makes the controller calibration pose
+        # map to where the robot's TCPs actually are (vs. a guessed static
+        # workspace_center). Verify it derives workspace center and arm offsets
+        # from the solvers' forward kinematics output.
+        class FakeFKSolver:
+            def __init__(self, position, orientation):
+                self._position = np.asarray(position, dtype=float)
+                self._orientation = np.asarray(orientation, dtype=float)
+
+            def compute_forward_kinematics(self, frame_name, joint_positions):
+                return (self._position, self._orientation)
+
+        adapter = OpenArmAdapter.from_mapping(
+            {
+                "robot_type": "openarm",
+                "usd": "assets/openarm.usd",
+                "urdf": "assets/openarm.urdf",
+                "left_arm_config": "robot_configs/openarm_config/left_arm",
+                "right_arm_config": "robot_configs/openarm_config/right_arm",
+                "left_arm": {
+                    "frame_name": "left_hand",
+                    "joints": ["left_joint1", "left_joint2", "left_joint3"],
+                    "preferred_config": [0.0, 0.0, 0.0],
+                },
+                "right_arm": {
+                    "frame_name": "right_hand",
+                    "joints": ["right_joint1", "right_joint2", "right_joint3"],
+                    "preferred_config": [0.0, 0.0, 0.0],
+                },
+                "grippers": {
+                    "open_position": 0.044,
+                    "closed_position": 0.0,
+                    "speed": 0.003,
+                    "left_joints": ["left_finger1"],
+                    "right_joints": ["right_finger1"],
+                },
+                "ik": {"configure_home_from_fk": True},
+            },
+            project_root=PROJECT_ROOT,
+        )
+        # FK returns world-space EE poses: left at x=0.4, right at x=0.4, mirrored in y.
+        adapter.left_ik_solver = FakeFKSolver(
+            position=[0.4, 0.2, 0.3],
+            orientation=[1.0, 0.0, 0.0, 0.0],  # wxyz identity
+        )
+        adapter.right_ik_solver = FakeFKSolver(
+            position=[0.4, -0.2, 0.3],
+            orientation=[1.0, 0.0, 0.0, 0.0],
+        )
+        # Stub get_current_joint_positions so configure_* can read positions.
+        adapter.get_current_joint_positions = lambda: np.zeros(14, dtype=float)
+
+        config = TeleopSessionConfig()
+        updated = adapter.configure_runtime_home_from_current_pose(config)
+
+        # Center is the midpoint of the two TCPs; each arm offset is relative to it.
+        np.testing.assert_allclose(updated.robot_workspace_center, [0.4, 0.0, 0.3])
+        np.testing.assert_allclose(updated.left_arm_offset, [0.0, 0.2, 0.0])
+        np.testing.assert_allclose(updated.right_arm_offset, [0.0, -0.2, 0.0])
+
+    def test_openarm_adapter_skips_fk_home_when_not_enabled(self):
+        # Without configure_home_from_fk, the config must pass through unchanged
+        # so robots with a tuned static workspace_center (acone) keep working.
+        adapter = OpenArmAdapter.from_mapping(
+            {
+                "robot_type": "openarm",
+                "usd": "assets/openarm.usd",
+                "urdf": "assets/openarm.urdf",
+                "left_arm_config": "robot_configs/openarm_config/left_arm",
+                "right_arm_config": "robot_configs/openarm_config/right_arm",
+                "left_arm": {
+                    "frame_name": "left_hand",
+                    "joints": ["left_joint1", "left_joint2", "left_joint3"],
+                    "preferred_config": [0.0, 0.0, 0.0],
+                },
+                "right_arm": {
+                    "frame_name": "right_hand",
+                    "joints": ["right_joint1", "right_joint2", "right_joint3"],
+                    "preferred_config": [0.0, 0.0, 0.0],
+                },
+                "grippers": {
+                    "open_position": 0.044,
+                    "closed_position": 0.0,
+                    "speed": 0.003,
+                    "left_joints": ["left_finger1"],
+                    "right_joints": ["right_finger1"],
+                },
+            },
+            project_root=PROJECT_ROOT,
+        )
+        config = TeleopSessionConfig(robot_workspace_center=[0.3, 0.0, 0.3])
+        updated = adapter.configure_runtime_home_from_current_pose(config)
+        np.testing.assert_allclose(updated.robot_workspace_center, [0.3, 0.0, 0.3])
 
     def test_panda_adapter_exposes_workspace_and_home(self):
         adapter = PandaAdapter.from_yaml(
@@ -854,7 +1174,13 @@ class IsaacBackendImportTests(unittest.TestCase):
 
         self.assertEqual(captured_argv, [["teleop"]])
         self.assertIn("omni.isaac.ros2_bridge", enabled_extensions)
-        self.assertIn("omni.services.livestream.nvcf", enabled_extensions)
+        # The livestream extension name depends on the Isaac Sim build (NVCF cloud
+        # vs local WebRTC). Verify that *some* livestream extension was enabled.
+        livestream_enabled = [e for e in enabled_extensions if "livestream" in e]
+        self.assertTrue(
+            livestream_enabled,
+            f"Expected a livestream extension to be enabled, got: {enabled_extensions}",
+        )
 
 
 if __name__ == "__main__":

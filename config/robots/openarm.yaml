@@ -1,5 +1,5 @@
 robot_type: openarm
-usd: "robot_configs/openarm_config/openarm_bimanual/openarm_bimanual.usd"
+usd: "robot_configs/openarm_config/openarm_bimanual/openarm_bimanual_env.usd"
 urdf: "robot_configs/openarm_config/openarm_bimanual_stl.urdf"
 left_arm_config: "robot_configs/openarm_config/left_arm"
 right_arm_config: "robot_configs/openarm_config/right_arm"
@@ -49,6 +49,29 @@ grippers:
   right_joints:
     - "openarm_right_finger_joint1"
     - "openarm_right_finger_joint2"
+
+# IK configuration. OpenArm's Lula descriptor roots its kinematic chain at the
+# URDF "world" link, but the robot is nested under /World/Robot in the scene.
+# Without telling Lula where the base actually sits, world-space teleop targets
+# resolve in the wrong frame and IK fails every frame. set_solver_base_pose_
+# from_stage reads the robot prim's world transform at init and applies it to
+# both solvers so targets line up with the chain. orientation_fallback_to_
+# position lets full-pose IK degrade gracefully to position-only when the
+# Quest's raw orientation is unreachable for the 7-DOF arm (matches acone/ffw).
+ik:
+  set_solver_base_pose_from_stage: true
+  # Derive the teleop home pose (workspace center + arm offsets + home
+  # orientation) from the robot's CURRENT joint positions via forward
+  # kinematics at startup, instead of the generic workspace_center guess
+  # [0.3, 0.0, 0.3] below. This is what makes ffw_bg2/acone track naturally:
+  # the controller calibration pose maps exactly to where the robot's TCPs
+  # actually are, so there is no coordinate-frame mismatch.
+  configure_home_from_fk: true
+  orientation_mode: "full_pose"
+  position_tolerance: 0.003
+  orientation_tolerance: 0.25
+  orientation_fallback_to_position: true
+  max_ik_joint_step_rad: 0.08
 
 cameras:
   head:

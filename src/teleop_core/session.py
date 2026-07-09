@@ -92,6 +92,11 @@ class TeleopSessionConfig:
     smoothing: float = 0.9
     position_alpha: float | None = None
     orientation_alpha: float | None = None
+    # Time-constant smoothing (preferred over *_alpha for rate-invariance).
+    # tau_s is the exponential time constant; alpha = exp(-dt/tau) each step.
+    # If set, this takes precedence over *_alpha. Default None (legacy alpha).
+    position_tau_s: float | None = None
+    orientation_tau_s: float | None = None
     gripper_threshold: float = 0.5
     calibration_samples: int = 30
     deadman_timeout_s: float = 0.5
@@ -145,6 +150,10 @@ class TeleopSessionConfig:
             self.orientation_alpha = self.smoothing
         self.position_alpha = float(np.clip(self.position_alpha, 0.0, 1.0))
         self.orientation_alpha = float(np.clip(self.orientation_alpha, 0.0, 1.0))
+        if self.position_tau_s is not None:
+            self.position_tau_s = max(1e-6, float(self.position_tau_s))
+        if self.orientation_tau_s is not None:
+            self.orientation_tau_s = max(1e-6, float(self.orientation_tau_s))
         self.gripper_threshold = float(self.gripper_threshold)
         self.calibration_samples = max(1, int(self.calibration_samples))
         self.deadman_timeout_s = max(0.0, float(self.deadman_timeout_s))
@@ -238,11 +247,19 @@ class _HandRuntime:
         self.soft_stale_active = False
         self.hard_timeout_active = False
         self.position_filter = (
-            PositionEMA(config.position_alpha) if config.position_alpha > 0.0 else None
+            PositionEMA(
+                alpha=config.position_alpha if config.position_tau_s is None else None,
+                tau_s=config.position_tau_s,
+            )
+            if (config.position_tau_s is not None or config.position_alpha > 0.0)
+            else None
         )
         self.orientation_filter = (
-            OrientationSlerp(config.orientation_alpha)
-            if config.orientation_alpha > 0.0
+            OrientationSlerp(
+                alpha=config.orientation_alpha if config.orientation_tau_s is None else None,
+                tau_s=config.orientation_tau_s,
+            )
+            if (config.orientation_tau_s is not None or config.orientation_alpha > 0.0)
             else None
         )
         self.safety = TargetSafety(
@@ -316,6 +333,7 @@ class BimanualTeleopSession:
         self,
         controller_states: Mapping[str, ControllerState | None],
         now_s: float | None = None,
+        dt_s: float | None = None,
     ) -> TeleopSessionUpdate:
         if now_s is None:
             now_s = time.monotonic()
@@ -328,13 +346,13 @@ class BimanualTeleopSession:
 
         targets = BimanualTeleopTargets(
             left_ee=EndEffectorTarget(
-                position_xyz=self._smoothed_position(self.left, now_s),
-                orientation_wxyz=self._smoothed_orientation(self.left),
+                position_xyz=self._smoothed_position(self.left, now_s, dt_s),
+                orientation_wxyz=self._smoothed_orientation(self.left, dt_s),
                 valid=self.left.calibrated,
             ),
             right_ee=EndEffectorTarget(
-                position_xyz=self._smoothed_position(self.right, now_s),
-                orientation_wxyz=self._smoothed_orientation(self.right),
+                position_xyz=self._smoothed_position(self.right, now_s, dt_s),
+                orientation_wxyz=self._smoothed_orientation(self.right, dt_s),
                 valid=self.right.calibrated,
             ),
             left_gripper=self._gripper_target(self.left),
@@ -530,21 +548,31 @@ class BimanualTeleopSession:
         predicted = runtime.target_pos + runtime.target_velocity_mps * horizon_s
         if self.config.workspace_bounds is not None:
             predicted = self.config.workspace_bounds.clamp(predicted)
+
+        # Safety: clamp the predicted jump relative to the last smoothed position
+        # so prediction can never yank the arm further than max_target_jump_m in a
+        # single step. This composes prediction with the existing jump guard.
+        if self.config.max_target_jump_m is not None and self.config.max_target_jump_m > 0.0:
+            delta = predicted - runtime.smoothed_pos
+            distance = float(np.linalg.norm(delta))
+            if distance > self.config.max_target_jump_m:
+                predicted = runtime.smoothed_pos + delta / distance * self.config.max_target_jump_m
+
         return predicted
 
-    def _smoothed_position(self, runtime: _HandRuntime, now_s: float) -> np.ndarray:
+    def _smoothed_position(self, runtime: _HandRuntime, now_s: float, dt_s: float | None = None) -> np.ndarray:
         target_pos = self._predicted_position(runtime, now_s)
         if runtime.position_filter is None:
             runtime.smoothed_pos = target_pos.copy()
         else:
-            runtime.smoothed_pos = runtime.position_filter.update(target_pos)
+            runtime.smoothed_pos = runtime.position_filter.update(target_pos, dt_s=dt_s)
         return runtime.smoothed_pos.copy()
 
-    def _smoothed_orientation(self, runtime: _HandRuntime) -> np.ndarray:
+    def _smoothed_orientation(self, runtime: _HandRuntime, dt_s: float | None = None) -> np.ndarray:
         if runtime.orientation_filter is None:
             runtime.smoothed_rot = runtime.target_rot.copy()
         else:
-            runtime.smoothed_rot = runtime.orientation_filter.update(runtime.target_rot)
+            runtime.smoothed_rot = runtime.orientation_filter.update(runtime.target_rot, dt_s=dt_s)
         return runtime.smoothed_rot.copy()
 
     def _snapshot(self, runtime: _HandRuntime, now_s: float) -> HandSessionState:
@@ -651,6 +679,7 @@ class SingleArmTeleopSession(BimanualTeleopSession):
         self,
         controller_state: ControllerState | None,
         now_s: float | None = None,
+        dt_s: float | None = None,
     ) -> SingleArmTeleopSessionUpdate:
         if now_s is None:
             now_s = time.monotonic()
@@ -661,8 +690,8 @@ class SingleArmTeleopSession(BimanualTeleopSession):
 
         targets = SingleArmTeleopTargets(
             ee_target=EndEffectorTarget(
-                position_xyz=self._smoothed_position(self.arm, now_s),
-                orientation_wxyz=self._smoothed_orientation(self.arm),
+                position_xyz=self._smoothed_position(self.arm, now_s, dt_s),
+                orientation_wxyz=self._smoothed_orientation(self.arm, dt_s),
                 valid=self.arm.calibrated,
             ),
             gripper_target=self._gripper_target(self.arm),

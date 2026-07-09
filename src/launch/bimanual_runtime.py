@@ -101,7 +101,9 @@ def run_bimanual_runtime(
         print(f"[Init] Loading {robot_display_name} robot...")
         try:
             adapter.load(world, world.stage)
-        except RuntimeError as exc:
+        except Exception as exc:
+            import traceback
+            traceback.print_exc()
             print(f"[ERROR] {exc}")
             return 1
         print(f"[Init] Found robot at: {adapter.robot_prim_path}")
@@ -190,6 +192,8 @@ def run_bimanual_runtime(
             domain_randomizer=domain_randomizer,
             recorder=recorder,
             recording_schema=recording_schema,
+            target_control_rate_hz=isaac_config.get("target_control_rate_hz", 120.0),
+            render_every_n_steps=isaac_config.get("render_every_n_steps", 2),
         )
 
         _print_session_statistics(adapter, camera_manager, recorder)
@@ -199,6 +203,8 @@ def run_bimanual_runtime(
             _cleanup_resource("close recorder", recorder.close)
         if camera_manager is not None:
             _cleanup_resource("close camera manager", camera_manager.close)
+        if hasattr(adapter, "close"):
+            _cleanup_resource("close adapter", adapter.close)
         if controller_provider is not None:
             _cleanup_resource("destroy ROS controller node", controller_provider.destroy_node)
         if ros_started and rclpy is not None:
@@ -322,8 +328,11 @@ def _run_control_loop(
     domain_randomizer: DomainRandomizer | None,
     recorder: LeRobotEpisodeRecorder | None,
     recording_schema,
+    target_control_rate_hz: float = 120.0,
+    render_every_n_steps: int = 2,
 ) -> None:
     ik_disabled_reported = False
+    joint_unavailable_reported = False
     quiet_recording = recorder is not None and not recording_settings.verbose
     control_metrics = ControlMetricsReporter(enabled=recorder is None and not debug_ik)
     button_mapper = ButtonEdgeMapper(recording_settings.buttons)
@@ -332,91 +341,192 @@ def _run_control_loop(
         recording_active=recording_settings.auto_start_episode and recorder is not None,
     )
 
+    # Real-time control-loop pacing. The physics+IK loop is decoupled from the
+    # render frame time: it advances at up to target_control_rate_hz while
+    # rendering is throttled to one render every render_every_n_steps. This is
+    # the single highest-impact latency change — render cost no longer gates the
+    # control rate. We use a monotonic tick schedule: after each iteration we
+    # sleep until the next tick; if an iteration overran (fell more than one
+    # tick behind) we reset the schedule to avoid spiraling.
+    target_dt_s = 1.0 / max(1.0, float(target_control_rate_hz))
+    render_every_n_steps = max(1, int(render_every_n_steps))
+    next_tick_s = time.monotonic()
+    # Rate-limit the "could not keep up" notice so a loop that consistently
+    # can't hit target_control_rate_hz (rendering is the usual bottleneck)
+    # informs the operator once instead of flooding the terminal on every
+    # overrun. Re-allowed at most every _PACING_LOG_MIN_INTERVAL_S seconds.
+    _PACING_LOG_MIN_INTERVAL_S = 30.0
+    _last_pacing_log_s: float | None = None
+    # Track the actual loop period so the session's smoothing filters (in
+    # time-constant / tau mode) can compute a rate-invariant coefficient.
+    prev_iteration_s: float | None = None
+
     if recorder is not None and recording_settings.verbose:
         _print_recording_waiting_status(recording_state, recorder)
 
-    while isaac_app.is_running():
-        rclpy.spin_once(controller_provider, timeout_sec=0.0)
-        latest_states = controller_provider.latest()
-        session_update = teleop_session.update(latest_states)
-        button_events = button_mapper.update(latest_states)
+    try:
+        while isaac_app.is_running():
+            rclpy.spin_once(controller_provider, timeout_sec=0.0)
+            latest_states = controller_provider.latest()
 
-        if recorder is not None and _sync_recording_progress(recording_state, recorder, verbose=not quiet_recording):
-            break
+            # Measure the actual time since the previous iteration for dt-aware
+            # smoothing. The first iteration and any after a long gap (e.g. a
+            # scene reset) use the target dt as a safe default.
+            now_s = time.monotonic()
+            if prev_iteration_s is not None:
+                loop_dt_s = now_s - prev_iteration_s
+                # Discard implausible gaps (pauses, resets); fall back to target.
+                if loop_dt_s > 1.0 or loop_dt_s <= 0.0:
+                    loop_dt_s = target_dt_s
+            else:
+                loop_dt_s = target_dt_s
+            prev_iteration_s = now_s
 
-        _log_session_events(session_update.events, controller_provider, enabled=not quiet_recording)
-        reset_requested = _handle_button_events(
-            button_events=button_events,
-            isaac_app=isaac_app,
-            adapter=adapter,
-            teleop_session=teleop_session,
-            camera_manager=camera_manager,
-            domain_randomizer=domain_randomizer,
-            recorder=recorder,
-            recording_state=recording_state,
-            session_ready=session_update.ready,
-            verbose_recording=not quiet_recording,
-        )
-        if reset_requested:
-            isaac_app.step(render=True)
-            continue
+            session_update = teleop_session.update(latest_states, dt_s=loop_dt_s)
+            button_events = button_mapper.update(latest_states)
 
-        if not session_update.ready:
-            _handle_not_ready(
-                isaac_app,
-                controller_provider,
-                session_update,
-                teleop_session.config,
-                verbose=not quiet_recording,
-            )
-            continue
+            if recorder is not None and _sync_recording_progress(recording_state, recorder, verbose=not quiet_recording):
+                break
 
-        current_positions = adapter.get_current_joint_positions()
-        if current_positions is None:
-            isaac_app.step(render=True)
-            continue
-
-        action = adapter.compute_action(session_update.targets)
-        _maybe_print_ik_debug(
-            adapter,
-            teleop_session,
-            session_update,
-            debug_ik,
-            current_positions=current_positions,
-            action_positions=action.joint_positions,
-        )
-
-        if not ik_enabled and not ik_disabled_reported:
-            print("[INFO] IK disabled; holding arm joints while grippers remain responsive")
-            ik_disabled_reported = True
-
-        adapter.apply_action(action)
-        teleop_session.mark_isaac_apply()
-        stamp = controller_provider.get_clock().now().to_msg()
-        joint_state_publisher.publish(dof_names, action.joint_positions, stamp=stamp)
-        camera_frames = camera_manager.update(
-            stamp=stamp,
-            return_frames=recorder is not None,
-        )
-
-        if recorder is not None and recording_schema is not None and recording_state.recording_active:
-            _maybe_record_frame(
+            _log_session_events(session_update.events, controller_provider, enabled=not quiet_recording)
+            reset_requested = _handle_button_events(
+                button_events=button_events,
+                isaac_app=isaac_app,
                 adapter=adapter,
+                teleop_session=teleop_session,
+                camera_manager=camera_manager,
+                domain_randomizer=domain_randomizer,
                 recorder=recorder,
-                recording_settings=recording_settings,
-                recording_schema=recording_schema,
-                current_positions=current_positions,
-                action=action,
-                camera_frames=camera_frames or {},
+                recording_state=recording_state,
+                session_ready=session_update.ready,
+                verbose_recording=not quiet_recording,
             )
-            _maybe_print_recording_frame_progress(
-                recording_state,
-                recorder,
-                verbose=not quiet_recording,
-            )
-        control_metrics.record(session_update, adapter, controller_provider.get_logger())
+            if reset_requested:
+                isaac_app.step(render=True)
+                next_tick_s = time.monotonic() + target_dt_s
+                continue
 
-        isaac_app.step(render=True)
+            if not session_update.ready:
+                _handle_not_ready(
+                    isaac_app,
+                    controller_provider,
+                    session_update,
+                    teleop_session.config,
+                    verbose=not quiet_recording,
+                )
+                next_tick_s = time.monotonic() + target_dt_s
+                continue
+
+            current_positions = adapter.get_current_joint_positions()
+            if current_positions is None:
+                if not joint_unavailable_reported:
+                    joint_unavailable_reported = True
+                    print(
+                        "[WARN] Robot joint positions unavailable (physics handle invalid); "
+                        "holding arms. This is expected right after a scene reset and should "
+                        "recover within a frame. If it persists, the articulation physics view "
+                        "could not be rebuilt after the reset."
+                    )
+                isaac_app.step(render=True)
+                next_tick_s = time.monotonic() + target_dt_s
+                continue
+
+            joint_unavailable_reported = False
+
+            action = adapter.compute_action(session_update.targets)
+            _maybe_print_ik_debug(
+                adapter,
+                teleop_session,
+                session_update,
+                debug_ik,
+                current_positions=current_positions,
+                action_positions=action.joint_positions,
+            )
+
+            if not ik_enabled and not ik_disabled_reported:
+                print("[INFO] IK disabled; holding arm joints while grippers remain responsive")
+                ik_disabled_reported = True
+
+            adapter.apply_action(action)
+            teleop_session.mark_isaac_apply()
+            stamp = controller_provider.get_clock().now().to_msg()
+            joint_state_publisher.publish(dof_names, action.joint_positions, stamp=stamp)
+
+            # Decide once whether this iteration will render, then reuse the
+            # decision for camera capture and the sim step. Camera capture is
+            # gated on `will_render` so it only runs when fresh pixels exist.
+            will_render = _advance_render_counter(adapter, render_every_n_steps)
+            camera_frames = camera_manager.update(
+                stamp=stamp,
+                return_frames=recorder is not None,
+                rendered=will_render,
+            )
+
+            if recorder is not None and recording_schema is not None and recording_state.recording_active:
+                _maybe_record_frame(
+                    adapter=adapter,
+                    recorder=recorder,
+                    recording_settings=recording_settings,
+                    recording_schema=recording_schema,
+                    current_positions=current_positions,
+                    action=action,
+                    camera_frames=camera_frames or {},
+                )
+                _maybe_print_recording_frame_progress(
+                    recording_state,
+                    recorder,
+                    verbose=not quiet_recording,
+                )
+            control_metrics.record(session_update, adapter, controller_provider.get_logger())
+
+            # Throttle rendering: render only every Nth physics step so the
+            # control rate is not bounded by the (expensive) render frame time.
+            isaac_app.step(render=will_render)
+
+            # Real-time pacing: sleep to the next scheduled tick. If we have
+            # fallen more than a full tick behind (slow frame), reset the
+            # schedule to the present instead of accumulating debt ("spiral of
+            # death"). The control metrics reporter logs the achieved loop rate.
+            next_tick_s += target_dt_s
+            now_s = time.monotonic()
+            if now_s - next_tick_s > target_dt_s:
+                # Behind by more than one tick: reset schedule to now + dt so we
+                # never accumulate unbounded debt ("spiral of death"). The notice
+                # is rate-limited so a chronically slow loop doesn't spam; once
+                # per _PACING_LOG_MIN_INTERVAL_S is enough to surface the issue.
+                if (
+                    _last_pacing_log_s is None
+                    or now_s - _last_pacing_log_s >= _PACING_LOG_MIN_INTERVAL_S
+                ):
+                    print(
+                        f"[Pacing] control loop could not keep up with "
+                        f"{target_control_rate_hz:.0f}Hz (render_every_n_steps="
+                        f"{render_every_n_steps}); resetting schedule."
+                    )
+                    _last_pacing_log_s = now_s
+                next_tick_s = now_s + target_dt_s
+            else:
+                sleep_s = next_tick_s - now_s
+                if sleep_s > 0.0:
+                    time.sleep(sleep_s)
+    except Exception as exc:
+        import traceback
+        traceback.print_exc()
+        print(f"[ERROR] Control loop crashed: {exc}")
+
+
+def _advance_render_counter(adapter: OpenArmAdapter, render_every_n_steps: int) -> bool:
+    """Advance the per-iteration render counter and report whether this
+    iteration should render.
+
+    Uses a per-adapter monotonic counter so the render cadence is independent of
+    the early-continue paths above (which always render to keep the operator's
+    view responsive during calibration/reset). The same decision is reused for
+    camera capture so we never block on a GPU read for a non-render frame.
+    """
+    counter = getattr(adapter, "_render_step_counter", 0) + 1
+    adapter._render_step_counter = counter
+    return (counter % render_every_n_steps) == 0
 
 
 def _log_session_events(events, controller_provider, *, enabled: bool = True) -> None:
@@ -606,34 +716,64 @@ def _reset_scene(
     *,
     verbose: bool = True,
 ) -> None:
-    isaac_app.reset_world()
     adapter.reset_runtime_state()
     teleop_session.reset(preserve_calibration=True)
+
+    sample = None
+    # Mutate the USD stage WHILE PHYSICS IS STOPPED. Removing/spawning
+    # physics-enabled prims (nuts/bolts) while PhysX is running leaves the
+    # running scene's body registry inconsistent; the robot articulation's
+    # tensor view then returns None forever (the second reset would silently
+    # freeze the arms). Stopping here, then reset_world() below rebuilds a
+    # fresh PhysX scene that includes the new bodies, and the articulation view
+    # stays valid.
     if domain_randomizer is not None and domain_randomizer.enabled:
-        sample = domain_randomizer.randomize(isaac_app.step)
-        if verbose:
-            cube_pose = getattr(sample, "cube_pose", None)
-            tray_pose = getattr(sample, "tray_pose", None)
-            missing_prims = getattr(sample, "missing_prims", ())
-            if missing_prims:
-                print(
-                    "[Scene] Randomization skipped: "
-                    f"missing_prims={list(missing_prims)}, "
-                    f"light_intensity={sample.light_intensity}"
-                )
-            elif cube_pose is not None or tray_pose is not None:
-                print(
-                    "[Scene] Randomized: "
-                    f"cube_position={cube_pose[0] if cube_pose else None}, "
-                    f"tray_position={tray_pose[0] if tray_pose else None}, "
-                    f"light_intensity={sample.light_intensity}"
-                )
-            else:
-                print(
-                    "[Scene] Randomized: "
-                    f"nuts={sample.nut_count}, bolts={sample.bolt_count}, "
-                    f"light_intensity={sample.light_intensity}, floor_color={sample.floor_color}"
-                )
+        isaac_app.stop()
+        sample = domain_randomizer.apply_randomization()
+
+    # reset_world() does stop/play + scene._finalize(), which (re-)initializes
+    # every articulation's PhysX tensor view against the freshly built scene.
+    isaac_app.reset_world()
+
+    if sample is not None and verbose:
+        cube_pose = getattr(sample, "cube_pose", None)
+        tray_pose = getattr(sample, "tray_pose", None)
+        missing_prims = getattr(sample, "missing_prims", ())
+        if missing_prims:
+            print(
+                "[Scene] Randomization skipped: "
+                f"missing_prims={list(missing_prims)}, "
+                f"light_intensity={sample.light_intensity}"
+            )
+        elif cube_pose is not None or tray_pose is not None:
+            print(
+                "[Scene] Randomized: "
+                f"cube_position={cube_pose[0] if cube_pose else None}, "
+                f"tray_position={tray_pose[0] if tray_pose else None}, "
+                f"light_intensity={sample.light_intensity}"
+            )
+        else:
+            print(
+                "[Scene] Randomized: "
+                f"nuts={sample.nut_count}, bolts={sample.bolt_count}, "
+                f"light_intensity={sample.light_intensity}, floor_color={sample.floor_color}"
+            )
+
+    # Let newly spawned physics objects settle into place now that the scene is
+    # running again. Done AFTER reset_world so the spawned bodies actually exist
+    # in the PhysX scene.
+    if domain_randomizer is not None and domain_randomizer.enabled:
+        domain_randomizer.settle(isaac_app.step)
+
+    # reset_world()'s _finalize should have rebuilt the articulation handles, but
+    # some Isaac Sim 6.0 builds leave the deprecated Articulation's _physics_view
+    # invalidated after a stop/play with changed body composition. Force a
+    # re-init here as a belt-and-suspenders recovery so a transient handle fault
+    # never silently freezes teleop. If it cannot be recovered, the control loop
+    # logs a warning each tick instead of hanging silently.
+    if hasattr(adapter, "reinitialize_physics_handles"):
+        adapter.reinitialize_physics_handles()
+        isaac_app.step(render=True)
 
 
 def _handle_not_ready(

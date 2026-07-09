@@ -179,7 +179,7 @@ The robot will hold its last successful position when IK fails.
    ```
 
 3. **Missing USD file**:
-   Check that `robot_configs/openarm_config/openarm_bimanual/openarm_bimanual.usd` exists.
+   Check that `robot_configs/openarm_config/openarm_bimanual/openarm_bimanual_env.usd` exists.
 
 ---
 

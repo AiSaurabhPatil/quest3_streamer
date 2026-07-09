@@ -43,14 +43,35 @@ def import_ros_interfaces():
     return rclpy, Node, PoseStamped, Joy
 
 
+def _teleop_qos(queue_size: int = 1):
+    """Sensor-data QoS for live teleop topics: keep only the newest sample so a
+    slow subscriber can never back-pressure the publisher, and BEST_EFFORT drops
+    stale samples instead of head-of-line blocking. Falls back to a plain depth
+    if rclpy.qos is unavailable."""
+    try:
+        from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
+
+        return QoSProfile(
+            reliability=ReliabilityPolicy.BEST_EFFORT,
+            history=HistoryPolicy.KEEP_LAST,
+            depth=max(1, int(queue_size)),
+        )
+    except ImportError:
+        return max(1, int(queue_size))
+
+
 def build_ros_bridge_node_class(Node, PoseStamped, Joy):
     class WebXRROSBridge(Node):
         def __init__(self):
             super().__init__("webxr_ros_bridge")
-            self.pub_left_pose = self.create_publisher(PoseStamped, "/quest/left_hand/pose", 10)
-            self.pub_right_pose = self.create_publisher(PoseStamped, "/quest/right_hand/pose", 10)
-            self.pub_left_input = self.create_publisher(Joy, "/quest/left_hand/inputs", 10)
-            self.pub_right_input = self.create_publisher(Joy, "/quest/right_hand/inputs", 10)
+            # Use low-latency (depth-1, BEST_EFFORT) QoS: the newest pose/input
+            # sample is the only one that matters for live teleop, so we drop
+            # stale samples instead of queuing them.
+            pose_qos = _teleop_qos(1)
+            self.pub_left_pose = self.create_publisher(PoseStamped, "/quest/left_hand/pose", pose_qos)
+            self.pub_right_pose = self.create_publisher(PoseStamped, "/quest/right_hand/pose", pose_qos)
+            self.pub_left_input = self.create_publisher(Joy, "/quest/left_hand/inputs", pose_qos)
+            self.pub_right_input = self.create_publisher(Joy, "/quest/right_hand/inputs", pose_qos)
 
             self.get_logger().info("WebXR ROS Bridge initialized")
             self.get_logger().info("Publishing to: /quest/left_hand/pose, /quest/right_hand/pose")
@@ -314,9 +335,13 @@ class WebSocketServer:
 
 
 async def ros_spin(rclpy, node):
+    # Non-blocking pump: drain ready callbacks without waiting, then yield to the
+    # event loop with sleep(0) so the WebSocket handler stays maximally responsive.
+    # The old timeout_sec=0.01 + sleep(0.01) introduced up to ~20 ms of latency
+    # and bursty publish jitter under load.
     while rclpy.ok():
-        rclpy.spin_once(node, timeout_sec=0.01)
-        await asyncio.sleep(0.01)
+        rclpy.spin_once(node, timeout_sec=0.0)
+        await asyncio.sleep(0)
 
 
 def build_server_ssl_context(cert_file: str | None, key_file: str | None, logger: UnifiedLogger):
@@ -399,7 +424,7 @@ async def run_bridge(args) -> None:
             tasks.append(asyncio.create_task(ros_spin(rclpy, ros_node), name="quest-ros-spin"))
 
         await asyncio.gather(*tasks)
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, SystemExit):
         pass
     finally:
         if forwarder is not None:

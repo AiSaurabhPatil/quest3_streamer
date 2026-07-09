@@ -106,8 +106,17 @@ class CameraManager:
             self._publisher_thread.start()
         return self
 
-    def update(self, stamp=None, return_frames: bool = False):
+    def update(self, stamp=None, return_frames: bool = False, rendered: bool = True):
         if not self._annotators:
+            return {} if return_frames else None
+
+        # Only capture on iterations that actually rendered: a non-render physics
+        # step produces no fresh pixels, so annotator.get_data() would return
+        # stale data (or block on the GPU). This keeps capture cost proportional
+        # to the render rate rather than the (faster) control rate once physics
+        # and rendering are decoupled. When rendering every step (legacy
+        # behavior) `rendered` is always True and this is a no-op gate.
+        if not rendered:
             return {} if return_frames else None
 
         self._frame_counter += 1

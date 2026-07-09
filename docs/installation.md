@@ -118,7 +118,7 @@ paths:
   
   # OpenArm robot configuration
   openarm:
-    usd: "robot_configs/openarm_config/openarm_bimanual/openarm_bimanual.usd"
+    usd: "robot_configs/openarm_config/openarm_bimanual/openarm_bimanual_env.usd"
     urdf: "robot_configs/openarm_config/openarm_bimanual_stl.urdf"
     left_arm_config: "robot_configs/openarm_config/left_arm"
     right_arm_config: "robot_configs/openarm_config/right_arm"

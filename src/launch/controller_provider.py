@@ -31,6 +31,23 @@ def _metadata_from_header(header) -> dict[str, float | int]:
     return metadata
 
 
+def _teleop_qos(queue_size: int = 1):
+    """Sensor-data QoS for live teleop topics: keep only the newest sample so a
+    slow publisher/consumer can never back-pressure, and BEST_EFFORT drops stale
+    samples instead of head-of-line blocking. Falls back to a plain depth if
+    rclpy.qos is unavailable."""
+    try:
+        from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
+
+        return QoSProfile(
+            reliability=ReliabilityPolicy.BEST_EFFORT,
+            history=HistoryPolicy.KEEP_LAST,
+            depth=max(1, int(queue_size)),
+        )
+    except ImportError:
+        return max(1, int(queue_size))
+
+
 def _state_from_pose_msg(
     msg,
     hand: str,
@@ -101,12 +118,16 @@ def build_controller_provider_class(
             self._subscriptions = []
 
             for hand in self._hands:
+                # Match the bridge's low-latency QoS (depth-1, BEST_EFFORT) so
+                # the newest pose/input is consumed immediately and stale samples
+                # are dropped rather than queued.
+                pose_qos = _teleop_qos(1)
                 self._subscriptions.append(
                     self.create_subscription(
                         PoseStamped,
                         f"/quest/{hand}_hand/pose",
                         lambda msg, hand=hand: self.pose_callback(msg, hand),
-                        10,
+                        pose_qos,
                     )
                 )
                 self._subscriptions.append(
@@ -114,7 +135,7 @@ def build_controller_provider_class(
                         Joy,
                         f"/quest/{hand}_hand/inputs",
                         lambda msg, hand=hand: self.input_callback(msg, hand),
-                        10,
+                        pose_qos,
                     )
                 )
 

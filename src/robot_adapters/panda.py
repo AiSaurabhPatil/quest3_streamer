@@ -66,7 +66,10 @@ class PandaAdapter(RobotAdapter):
         return WorkspaceBounds(**workspace)
 
     def load(self, world, stage):
-        from omni.isaac.franka import Franka
+        try:
+            from isaacsim.robot.franka import Franka
+        except ImportError:
+            from omni.isaac.franka import Franka
 
         self.articulation = world.scene.add(
             Franka(
@@ -77,10 +80,16 @@ class PandaAdapter(RobotAdapter):
         return self.articulation
 
     def initialize_ik(self):
-        from omni.isaac.motion_generation import (
-            LulaKinematicsSolver,
-            interface_config_loader,
-        )
+        try:
+            from isaacsim.robot_motion.motion_generation import (
+                LulaKinematicsSolver,
+                interface_config_loader,
+            )
+        except ImportError:
+            from omni.isaac.motion_generation import (
+                LulaKinematicsSolver,
+                interface_config_loader,
+            )
 
         mg_config = interface_config_loader.load_supported_motion_policy_config(
             self.config.get("ik_robot_name", "Franka"),
@@ -151,7 +160,10 @@ class PandaAdapter(RobotAdapter):
         return RobotAction(joint_positions=target_positions)
 
     def apply_action(self, action):
-        from omni.isaac.core.utils.types import ArticulationAction
+        try:
+            from isaacsim.core.utils.types import ArticulationAction
+        except ImportError:
+            from omni.isaac.core.utils.types import ArticulationAction
 
         if self.articulation is None:
             raise RuntimeError("Robot articulation is not loaded")

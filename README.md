@@ -152,7 +152,7 @@ Edit `config/config.yaml` to customize paths:
 paths:
   isaac_sim: "/path/to/isaac_sim"
   openarm:
-    usd: "robot_configs/openarm_config/openarm_bimanual/openarm_bimanual.usd"
+    usd: "robot_configs/openarm_config/openarm_bimanual/openarm_bimanual_env.usd"
     urdf: "robot_configs/openarm_config/openarm_bimanual_stl.urdf"
   panda:
     usd: "environment.usd"
