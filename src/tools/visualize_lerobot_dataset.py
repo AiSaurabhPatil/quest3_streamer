@@ -105,30 +105,71 @@ def validate_dataset(root: Path, repo_id: str, episode_index: int) -> list[Valid
     dataset_root = _dataset_root(root, repo_id)
     issues: list[ValidationIssue] = []
 
-    required = (
-        dataset_root / "meta" / "info.json",
-        dataset_root / "meta" / "episodes.jsonl",
-        dataset_root / "meta" / "episodes_stats.jsonl",
-        dataset_root / "meta" / "tasks.jsonl",
-        dataset_root / "data",
-    )
+    info_path = dataset_root / "meta" / "info.json"
+    if not info_path.exists():
+        issues.append(ValidationIssue("error", f"Missing required path: {info_path}"))
+        return issues
+
+    info = _load_json(info_path)
+    version = info.get("codebase_version", "v2.1")
+    if version not in ("v2.1", "v3.0"):
+        issues.append(ValidationIssue("error", f"Expected v2.1 or v3.0 dataset, got {version}"))
+
+    if version == "v3.0":
+        required = (
+            dataset_root / "meta" / "info.json",
+            dataset_root / "meta" / "episodes",
+            dataset_root / "meta" / "stats.json",
+            dataset_root / "meta" / "tasks.parquet",
+            dataset_root / "data",
+        )
+    else:
+        required = (
+            dataset_root / "meta" / "info.json",
+            dataset_root / "meta" / "episodes.jsonl",
+            dataset_root / "meta" / "episodes_stats.jsonl",
+            dataset_root / "meta" / "tasks.jsonl",
+            dataset_root / "data",
+        )
+
     for path in required:
         if not path.exists():
             issues.append(ValidationIssue("error", f"Missing required path: {path}"))
     if any(issue.level == "error" for issue in issues):
         return issues
 
-    info = _load_json(dataset_root / "meta" / "info.json")
-    if info.get("codebase_version") != "v2.1":
-        issues.append(ValidationIssue("error", f"Expected v2.1 dataset, got {info.get('codebase_version')}"))
+    if version == "v3.0":
+        try:
+            from lerobot.datasets.dataset_metadata import LeRobotDatasetMetadata
+            meta = LeRobotDatasetMetadata(repo_id=repo_id, root=dataset_root)
+            episodes = list(meta.episodes)
+        except Exception as exc:
+            issues.append(ValidationIssue("error", f"Could not load metadata with LeRobotDatasetMetadata: {exc}"))
+            return issues
+    else:
+        try:
+            episodes = _load_jsonl(dataset_root / "meta" / "episodes.jsonl")
+        except Exception as exc:
+            issues.append(ValidationIssue("error", f"Could not load episodes.jsonl: {exc}"))
+            return issues
 
-    episodes = _load_jsonl(dataset_root / "meta" / "episodes.jsonl")
-    episode = next((item for item in episodes if int(item.get("episode_index", -1)) == episode_index), None)
-    if episode is None:
-        issues.append(ValidationIssue("error", f"Episode {episode_index} is missing from episodes.jsonl"))
-        return issues
+    if version == "v3.0":
+        list_index = next((i for i, item in enumerate(episodes) if int(item.get("episode_index", -1)) == episode_index), None)
+        if list_index is None:
+            issues.append(ValidationIssue("error", f"Episode {episode_index} is missing from episodes metadata"))
+            return issues
+        episode = episodes[list_index]
+    else:
+        episode = next((item for item in episodes if int(item.get("episode_index", -1)) == episode_index), None)
+        if episode is None:
+            issues.append(ValidationIssue("error", f"Episode {episode_index} is missing from episodes.jsonl"))
+            return issues
 
-    parquet_path = _episode_parquet_path(dataset_root, info, episode_index)
+    if version == "v3.0":
+        parquet_path = dataset_root / meta.get_data_file_path(list_index)
+    else:
+        parquet_path = _episode_parquet_path(dataset_root, info, episode_index)
+
     if not parquet_path.exists():
         issues.append(ValidationIssue("error", f"Missing parquet file: {parquet_path}"))
         return issues
@@ -139,36 +180,41 @@ def validate_dataset(root: Path, repo_id: str, episode_index: int) -> list[Valid
         issues.append(ValidationIssue("error", f"Could not read parquet: {exc}"))
         return issues
 
+    if version == "v3.0":
+        df_episode = df[df["episode_index"] == episode_index]
+    else:
+        df_episode = df
+
     expected_length = int(episode.get("length", -1))
-    if len(df) != expected_length:
-        issues.append(ValidationIssue("error", f"Parquet rows {len(df)} != episode length {expected_length}"))
+    if len(df_episode) != expected_length:
+        issues.append(ValidationIssue("error", f"Parquet rows {len(df_episode)} != episode length {expected_length}"))
 
     total_frames = int(info.get("total_frames", -1))
-    if len(episodes) == 1 and len(df) != total_frames:
-        issues.append(ValidationIssue("error", f"Parquet rows {len(df)} != info total_frames {total_frames}"))
+    if len(episodes) == 1 and len(df_episode) != total_frames:
+        issues.append(ValidationIssue("error", f"Parquet rows {len(df_episode)} != info total_frames {total_frames}"))
 
     features = dict(info.get("features", {}))
     for key in ("observation.state", "action", "timestamp", "frame_index", "episode_index", "index", "task_index"):
-        if key not in df.columns:
+        if key not in df_episode.columns:
             issues.append(ValidationIssue("error", f"Missing parquet column: {key}"))
 
     for key in ("observation.state", "action"):
-        if key in df.columns and key in features and len(df):
+        if key in df_episode.columns and key in features and len(df_episode):
             expected_shape = features[key].get("shape", [])
             expected_width = int(expected_shape[0]) if expected_shape else None
-            actual_width = len(df[key].iloc[0])
+            actual_width = len(df_episode[key].iloc[0])
             if expected_width is not None and actual_width != expected_width:
                 issues.append(ValidationIssue("error", f"{key} width {actual_width} != feature shape {expected_width}"))
-            for row_index, vector in enumerate(df[key]):
+            for row_index, vector in enumerate(df_episode[key]):
                 values = [float(value) for value in vector]
                 if any(not math.isfinite(value) for value in values):
                     issues.append(ValidationIssue("error", f"{key} has NaN/inf at row {row_index}"))
                     break
 
-    if {"timestamp", "frame_index"}.issubset(df.columns):
+    if {"timestamp", "frame_index"}.issubset(df_episode.columns):
         fps = float(info.get("fps", 0))
         if fps > 0:
-            max_error = max(abs(float(ts) - (int(frame) / fps)) for ts, frame in zip(df["timestamp"], df["frame_index"]))
+            max_error = max(abs(float(ts) - (int(frame) / fps)) for ts, frame in zip(df_episode["timestamp"], df_episode["frame_index"]))
             if max_error > 1e-3:
                 issues.append(ValidationIssue("error", f"Timestamp/frame_index drift is {max_error:.6f}s"))
 
@@ -176,7 +222,15 @@ def validate_dataset(root: Path, repo_id: str, episode_index: int) -> list[Valid
         key: value for key, value in features.items() if isinstance(value, dict) and value.get("dtype") == "video"
     }
     for key, feature in video_features.items():
-        path = _video_path(dataset_root, info, episode_index, key)
+        if version == "v3.0":
+            try:
+                path = dataset_root / meta.get_video_file_path(list_index, key)
+            except Exception as exc:
+                issues.append(ValidationIssue("error", f"Could not get video path for {key}: {exc}"))
+                continue
+        else:
+            path = _video_path(dataset_root, info, episode_index, key)
+
         if not path.exists():
             issues.append(ValidationIssue("error", f"Missing video file: {path}"))
             continue
@@ -190,8 +244,20 @@ def validate_dataset(root: Path, repo_id: str, episode_index: int) -> list[Valid
             _, expected_height, expected_width = [int(value) for value in shape]
             if int(probe.get("width", -1)) != expected_width or int(probe.get("height", -1)) != expected_height:
                 issues.append(ValidationIssue("error", f"{key} video resolution does not match feature shape"))
-        if "nb_frames" in probe and probe["nb_frames"].isdigit() and int(probe["nb_frames"]) != expected_length:
-            issues.append(ValidationIssue("error", f"{key} video frames {probe['nb_frames']} != episode length {expected_length}"))
+
+        if version == "v3.0":
+            vid_chunk = episode[f"videos/{key}/chunk_index"]
+            vid_file = episode[f"videos/{key}/file_index"]
+            sharing_eps = [
+                e for e in episodes
+                if e.get(f"videos/{key}/chunk_index") == vid_chunk and e.get(f"videos/{key}/file_index") == vid_file
+            ]
+            expected_video_length = sum(int(e["length"]) for e in sharing_eps)
+        else:
+            expected_video_length = expected_length
+
+        if "nb_frames" in probe and probe["nb_frames"].isdigit() and int(probe["nb_frames"]) != expected_video_length:
+            issues.append(ValidationIssue("error", f"{key} video frames {probe['nb_frames']} != expected video length {expected_video_length}"))
         if "avg_frame_rate" in probe:
             video_fps = _rate_to_float(probe["avg_frame_rate"])
             if abs(video_fps - float(info.get("fps", video_fps))) > 0.01:
@@ -237,20 +303,33 @@ def visualize_dataset(
     import rerun as rr
     import rerun.blueprint as rrb
 
-    dataset = _load_lerobot_dataset(repo_id, root, episode_index)
+    dataset_root = _dataset_root(root, repo_id)
+    dataset = _load_lerobot_dataset(repo_id, dataset_root, episode_index)
+    
+    state_names = dataset.features.get("observation.state", {}).get("names") or []
+    action_names = dataset.features.get("action", {}).get("names") or []
+    camera_keys = list(getattr(dataset.meta, "camera_keys", []))
+    scalar_cls = rr.Scalars if hasattr(rr, "Scalars") else rr.Scalar
+    series_line_cls = getattr(rr, "SeriesLine", None)
+
+    grid_views = [
+        rrb.TimeSeriesView(origin="/action", name="Action", plot_legend=rrb.PlotLegend(visible=True)),
+        rrb.TimeSeriesView(origin="/action_minus_state", name="Action - State", plot_legend=rrb.PlotLegend(visible=True)),
+    ]
+    for key in camera_keys:
+        cam_name = key.split(".")[-1].replace("_", " ").title()
+        grid_views.append(rrb.Spatial2DView(origin=f"/{key.replace('.', '/')}", name=cam_name))
+    grid_views.append(rrb.TimeSeriesView(origin="/state", name="State", plot_legend=rrb.PlotLegend(visible=True)))
+
     blueprint = rrb.Blueprint(
         rrb.Grid(
-            rrb.TimeSeriesView(origin="/action", name="Action", plot_legend=rrb.PlotLegend(visible=True)),
-            rrb.TimeSeriesView(origin="/action_minus_state", name="Action - State", plot_legend=rrb.PlotLegend(visible=True)),
-            rrb.Spatial2DView(origin="/observation/images/head_camera", name="Head Camera"),
-            rrb.Spatial2DView(origin="/observation/images/left_wrist_camera", name="Left Wrist Camera"),
-            rrb.Spatial2DView(origin="/observation/images/right_wrist_camera", name="Right Wrist Camera"),
-            rrb.TimeSeriesView(origin="/state", name="State", plot_legend=rrb.PlotLegend(visible=True)),
+            *grid_views,
             grid_columns=3,
         ),
         auto_views=False,
         collapse_panels=True,
     )
+    
     rr.init(
         f"{repo_id}/episode_{episode_index}",
         recording_id=str(uuid4()),
@@ -259,12 +338,6 @@ def visualize_dataset(
     )
     if serve:
         rr.serve_grpc(grpc_port=grpc_port)
-
-    state_names = dataset.features.get("observation.state", {}).get("names") or []
-    action_names = dataset.features.get("action", {}).get("names") or []
-    camera_keys = list(getattr(dataset.meta, "camera_keys", []))
-    scalar_cls = getattr(rr, "Scalars", rr.Scalar)
-    series_line_cls = getattr(rr, "SeriesLine", None)
 
     if series_line_cls is not None:
         for name in state_names:

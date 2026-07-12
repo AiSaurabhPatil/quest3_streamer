@@ -142,7 +142,7 @@ uv pip install --python .venv-lerobot-v21/bin/python "lerobot==0.3.2"
 LEROBOT_RECORDING_PYTHON=$PWD/.venv-lerobot-v21/bin/python ./scripts/run_openarm_teleop.sh --record
 ```
 
-Set `recording.dataset_format` to `v2.1`, `v3.0`, or `auto`. `auto` uses the
+Set `recording.dataset_format` to `v3.0`, `v2.1`, or `auto`. `auto` uses the
 format written by the selected LeRobot worker.
 
 Recorded camera videos default to 224x224 for pi0.5 training. The Isaac camera

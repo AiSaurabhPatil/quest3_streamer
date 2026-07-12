@@ -28,7 +28,7 @@ lan:
 
 # Remote transport / VPN tuning
 transport:
-  log_interval_s: 3.0
+  log_interval_s: 0.0
   # Pose prediction extrapolates the target by velocity * horizon to cancel the
   # residual group delay of the smoothing filter and the one-way transport age.
   # Bounded by the jump-safety clamp, so it cannot yank the arm. Tune horizon to
@@ -76,21 +76,21 @@ isaac:
   #   render_every_n_steps: render only every Nth physics step. Set to 1 to
   #     render every step (legacy behavior). Higher N = faster control loop,
   #     lower on-screen fps. N=2 is a good starting point for the windowed GUI.
-  target_control_rate_hz: 120
-  render_every_n_steps: 2
+  target_control_rate_hz: 60
+  render_every_n_steps: 1
 
 # Camera capture and ROS image publishing
 cameras:
   enabled: true
-  resolution: [224, 224]
-  publish_interval_frames: 4
-  queue_size: 3
+  resolution: [640, 480]
+  publish_interval_frames: 2
+  queue_size: 10
   log_errors: true
   error_log_interval_s: 5.0
 
 recording:
   enabled: false
-  dataset_format: "v2.1"
+  dataset_format: "v3.0"
   root: "datasets"
   repo_id: "local/quest3-openarm"
   task: "Teleoperate OpenArm to complete the task"
@@ -100,8 +100,9 @@ recording:
   encoder_threads: 4
   image_writer_threads: 4
   auto_start_episode: false
+  deferred_rendering: true
   cameras:
-    resolution: [224, 224]
+    resolution: [640, 480]
   buttons:
     switch_camera: "right_primary"
     reset_scene: "right_secondary"

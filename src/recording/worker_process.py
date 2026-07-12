@@ -68,7 +68,14 @@ class LeRobotWorkerProcess:
                 shutil.rmtree(dataset_root)
                 self._dataset = self._create_dataset(compat, dataset_root, robot_type)
                 return
-            _validate_existing_dataset_root(dataset_root, expected_format=compat.dataset_format)
+            try:
+                _validate_existing_dataset_root(dataset_root, expected_format=compat.dataset_format)
+            except RuntimeError as exc:
+                print(f"[Recording worker] Overwriting existing dataset path: {exc}", file=sys.stderr)
+                shutil.rmtree(dataset_root)
+                self._dataset = self._create_dataset(compat, dataset_root, robot_type)
+                return
+
             self._dataset = compat.open_dataset(
                 repo_id=self._config.repo_id,
                 root=dataset_root,
@@ -101,7 +108,7 @@ class LeRobotWorkerProcess:
             return False
         if message_type == "save":
             self.diagnostics.save_requests += 1
-            self._save_episode()
+            self._save_episode(domain_randomization=message.get("domain_randomization"))
             self._send_status("saved")
             return False
         if message_type == "discard":
@@ -127,7 +134,7 @@ class LeRobotWorkerProcess:
         self.diagnostics.frames_enqueued += 1
         self.diagnostics.frames_written += 1
 
-    def _save_episode(self) -> None:
+    def _save_episode(self, *, domain_randomization: dict | None = None) -> None:
         if self._buffered_frame_count <= 0:
             self.diagnostics.empty_save_requests += 1
             return
@@ -135,6 +142,11 @@ class LeRobotWorkerProcess:
             self._dataset.save_episode(parallel_encoding=self._config.save_parallel_encoding)
         except TypeError:
             self._dataset.save_episode()
+        # Write a sidecar JSON with scene metadata (domain randomization sample).
+        # This is intentionally separate from the LeRobot parquet schema so it
+        # survives LeRobot version upgrades without any schema migration.
+        ep_index = self.diagnostics.saved_episodes  # index of the episode just saved
+        self._write_episode_scene_sidecar(ep_index, domain_randomization)
         self._buffered_frame_count = 0
         self.diagnostics.saved_episodes += 1
 
@@ -156,6 +168,27 @@ class LeRobotWorkerProcess:
         if self._config.push_to_hub_on_shutdown:
             self._dataset.push_to_hub(private=self._config.private_hub_repo)
 
+    def _write_episode_scene_sidecar(self, episode_index: int, domain_randomization: dict | None) -> None:
+        """Write a per-episode sidecar JSON with scene metadata.
+
+        The sidecar lives at ``<dataset_root>/meta/episodes/scene_ep_{N:06d}.json``
+        and is intentionally outside the LeRobot parquet schema so it is immune
+        to library version changes. It is read back by ``extract_states.py``
+        during deferred rendering to reconstruct the exact scene configuration
+        that existed during teleop.
+        """
+        if domain_randomization is None:
+            return
+        dataset_root = Path(self._config.root) / self._config.repo_id
+        sidecar_dir = dataset_root / "meta" / "episodes"
+        sidecar_dir.mkdir(parents=True, exist_ok=True)
+        sidecar_path = sidecar_dir / f"scene_ep_{episode_index:06d}.json"
+        try:
+            with sidecar_path.open("w", encoding="utf-8") as f:
+                json.dump({"episode_index": episode_index, "domain_randomization": domain_randomization}, f, indent=2)
+        except Exception as exc:
+            print(f"[Recording worker] Warning: could not write scene sidecar {sidecar_path}: {exc}")
+
     def _frame_to_payload(self, snapshot: RecordingFrameSnapshot) -> dict[str, object]:
         payload: dict[str, object] = {
             self._schema.state_spec.key: snapshot.state,
@@ -169,6 +202,7 @@ class LeRobotWorkerProcess:
     def _record_error(self, exc: Exception) -> None:
         self.diagnostics.worker_errors += 1
         self.diagnostics.last_error = f"{type(exc).__name__}: {exc}"
+        print(f"[Worker Error] {self.diagnostics.last_error}")
 
     def _send_status(self, message_type: str) -> None:
         send_message(

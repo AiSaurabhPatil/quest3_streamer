@@ -82,6 +82,15 @@ class CameraImagePublishers:
             for name, spec in camera_specs.items()
         }
 
+    def has_subscribers(self, camera_name: str) -> bool:
+        if camera_name not in self._publishers:
+            return False
+        try:
+            return self._publishers[camera_name].get_subscription_count() > 0
+        except Exception:
+            # Fallback in case publisher API is mocked/unavailable
+            return True
+
     def publish_rgb(self, camera_name: str, image_rgb, stamp=None, frame_id: str | None = None):
         if camera_name not in self._publishers:
             raise KeyError(f"Unknown camera publisher: {camera_name}")

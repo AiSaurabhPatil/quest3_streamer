@@ -75,7 +75,7 @@ DEFAULT_MAIN_CONFIG = {
     },
     "cameras": {
         "enabled": True,
-        "resolution": [224, 224],
+        "resolution": [640, 480],
         "publish_interval_frames": 2,
         "queue_size": 3,
         "log_errors": True,
@@ -83,7 +83,7 @@ DEFAULT_MAIN_CONFIG = {
     },
     "recording": {
         "enabled": False,
-        "dataset_format": "v2.1",
+        "dataset_format": "v3.0",
         "root": "datasets",
         "repo_id": "local/quest3-openarm",
         "task": "Teleoperate OpenArm to complete the task",
@@ -138,7 +138,7 @@ DEFAULT_MAIN_CONFIG = {
             "include": ["head", "wrist_left", "wrist_right"],
             "feature_prefix": "observation.images",
             "dtype": "video",
-            "resolution": [224, 224],
+            "resolution": [640, 480],
         },
     },
 }

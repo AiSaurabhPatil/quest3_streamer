@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import colorsys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import math
 import random
 from typing import Any
@@ -89,6 +89,47 @@ class DomainRandomizationSample:
     bolt_count: int = 0
     light_intensity: float | None = None
     floor_color: tuple[float, float, float] | None = None
+    # Maps USD prim path -> {"position": [...], "orientation": [...]} for all
+    # randomized trays / objects, enabling deterministic scene reconstruction
+    # during deferred rendering.
+    tray_poses: dict = field(default_factory=dict)
+
+    def to_dict(self) -> dict:
+        """Serialize this sample to a plain JSON-compatible dict."""
+        return {
+            "type": self.__class__.__name__,
+            "nut_count": self.nut_count,
+            "bolt_count": self.bolt_count,
+            "light_intensity": self.light_intensity,
+            "floor_color": list(self.floor_color) if self.floor_color is not None else None,
+            "tray_poses": {
+                path: {"position": list(pose["position"]), "orientation": list(pose["orientation"])}
+                for path, pose in self.tray_poses.items()
+            },
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "DomainRandomizationSample":
+        """Reconstruct a sample from a plain dict (deserialized from JSON)."""
+        floor_color = d.get("floor_color")
+        tray_poses_raw = d.get("tray_poses", {})
+        return cls(
+            nut_count=int(d.get("nut_count", 0)),
+            bolt_count=int(d.get("bolt_count", 0)),
+            light_intensity=(
+                float(d["light_intensity"]) if d.get("light_intensity") is not None else None
+            ),
+            floor_color=(
+                tuple(float(v) for v in floor_color[:3]) if floor_color is not None else None
+            ),
+            tray_poses={
+                path: {
+                    "position": [float(v) for v in pose["position"]],
+                    "orientation": [float(v) for v in pose["orientation"]],
+                }
+                for path, pose in tray_poses_raw.items()
+            },
+        )
 
 
 class DomainRandomizer:
@@ -117,6 +158,71 @@ class DomainRandomizer:
             settle_step(render=True)
         return sample
 
+    def apply_randomization_from_dict(self, sample_dict: dict) -> None:
+        """Deterministically reconstruct a previously saved domain-randomization
+        state from its serialized dict.
+
+        Unlike ``apply_randomization()``, this method does NOT draw new random
+        values — it directly sets the exact poses and lighting that were
+        recorded during teleop so the rendered video matches the original scene.
+
+        Subclasses should override ``_apply_saved_object_poses`` and
+        ``_apply_saved_lighting`` to handle robot-specific prims.
+        """
+        if not self.enabled:
+            return
+        self._apply_saved_lighting(sample_dict)
+        self._apply_saved_floor(sample_dict)
+        self._apply_saved_object_poses(sample_dict)
+
+    # ------------------------------------------------------------------
+    # Deterministic replay helpers — override in subclasses as needed
+    # ------------------------------------------------------------------
+
+    def _apply_saved_lighting(self, sample_dict: dict) -> None:
+        """Restore the saved light intensity to all lights under light_root."""
+        from pxr import UsdLux
+
+        intensity = sample_dict.get("light_intensity")
+        if intensity is None:
+            return
+        light_root = str(self.config.get("prims", {}).get("light_root", "/World/Environment"))
+        for prim in self.stage.Traverse():
+            path = str(prim.GetPath())
+            if path != light_root and not path.startswith(light_root + "/"):
+                continue
+            if prim.GetTypeName() not in {
+                "CylinderLight", "DiskLight", "DistantLight",
+                "DomeLight", "RectLight", "SphereLight",
+            }:
+                continue
+            UsdLux.LightAPI(prim).CreateIntensityAttr(float(intensity))
+
+    def _apply_saved_floor(self, sample_dict: dict) -> None:
+        """Restore the saved floor color."""
+        floor_color = sample_dict.get("floor_color")
+        if floor_color is None:
+            return
+        from pxr import Gf, Sdf, UsdShade
+
+        color = tuple(float(v) for v in floor_color[:3])
+        looks_path = str(self.config.get("prims", {}).get("looks", "/World/Looks"))
+        shader = UsdShade.Shader.Get(self.stage, f"{looks_path}/randomized_floor_material/PreviewSurface")
+        if shader:
+            shader.CreateInput("diffuseColor", Sdf.ValueTypeNames.Color3f).Set(Gf.Vec3f(*color))
+        self._apply_floor_display_color(color)
+
+    def _apply_saved_object_poses(self, sample_dict: dict) -> None:
+        """Restore saved tray poses (base class handles the generic tray-jitter case)."""
+        tray_poses = sample_dict.get("tray_poses", {})
+        for path, pose_data in tray_poses.items():
+            prim = self.stage.GetPrimAtPath(path)
+            if not prim.IsValid():
+                continue
+            position = pose_data["position"]
+            orientation = pose_data["orientation"]
+            self._set_world_pose(prim, position, orientation)
+
     def apply_randomization(self) -> DomainRandomizationSample:
         """Mutate the USD stage for a new random sample without stepping physics.
 
@@ -137,7 +243,9 @@ class DomainRandomizer:
         self._clear_spawned_objects()
         sample.light_intensity = self._randomize_lighting()
         sample.floor_color = self._randomize_floor()
+        # Capture tray poses after jitter so they can be serialized.
         self._randomize_trays()
+        sample.tray_poses = self._capture_tray_poses()
         sample.nut_count, sample.bolt_count = self._spawn_objects()
         return sample
 
@@ -203,6 +311,23 @@ class DomainRandomizer:
             ]
             yaw_delta = _euler_xyz_degrees_to_quat_wxyz((0.0, 0.0, self.rng.uniform(-yaw_jitter, yaw_jitter)))
             self._set_world_pose(prim, randomized_position, _quat_multiply_wxyz(orientation, yaw_delta))
+
+    def _capture_tray_poses(self) -> dict:
+        """Read back the current world pose of every tracked tray prim.
+
+        Called after ``_randomize_trays()`` so the returned dict contains the
+        actual randomized poses (not the base poses). The dict can be stored in
+        ``DomainRandomizationSample.tray_poses`` and later passed to
+        ``_apply_saved_object_poses()`` during deferred rendering.
+        """
+        poses = {}
+        for path in self._tray_base_poses:
+            prim = self.stage.GetPrimAtPath(path)
+            if not prim.IsValid():
+                continue
+            position, orientation = self._get_world_pose(prim)
+            poses[path] = {"position": position, "orientation": orientation}
+        return poses
 
     def _randomize_lighting(self) -> float | None:
         from pxr import UsdLux

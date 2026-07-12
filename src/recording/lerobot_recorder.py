@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import os
+import sys
 import queue
 import subprocess
 import threading
@@ -86,9 +87,9 @@ class LeRobotEpisodeRecorder:
             self._diagnostics.queue_depth = self._send_queue.qsize()
             return False
 
-    def save_episode_async(self, *, reason: str | None = None) -> None:
+    def save_episode_async(self, *, reason: str | None = None, domain_randomization: dict | None = None) -> None:
         self._diagnostics.save_requests += 1
-        self._enqueue_command({"type": "save", "reason": reason})
+        self._enqueue_command({"type": "save", "reason": reason, "domain_randomization": domain_randomization})
 
     def discard_episode_async(self, *, reason: str | None = None) -> None:
         self._diagnostics.discard_requests += 1
@@ -147,20 +148,13 @@ class LeRobotEpisodeRecorder:
             cwd=self._project_root,
             env=env,
             stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.PIPE if self._config.verbose else subprocess.DEVNULL,
+            stdout=sys.stdout,
+            stderr=sys.stderr,
             text=True,
             pass_fds=(child_read_fd, child_write_fd),
         )
         os.close(child_read_fd)
         os.close(child_write_fd)
-        if self._config.verbose:
-            self._worker_stderr_thread = threading.Thread(
-                target=self._drain_worker_stderr,
-                name="lerobot-recorder-stderr",
-                daemon=True,
-            )
-            self._worker_stderr_thread.start()
 
         try:
             self._send_message(
@@ -246,6 +240,22 @@ class LeRobotEpisodeRecorder:
             except queue.Empty:
                 continue
             try:
+                if message.get("type") == "frame":
+                    snapshot = message["snapshot"]
+                    resolved_cameras = {}
+                    for cam_name, future_or_array in snapshot.cameras.items():
+                        if hasattr(future_or_array, "result"):
+                            result = future_or_array.result()
+                            if result is not None:
+                                _, image_rgb = result
+                                if image_rgb is not None:
+                                    resolved_cameras[cam_name] = image_rgb
+                        else:
+                            resolved_cameras[cam_name] = future_or_array
+                    
+                    snapshot.cameras.clear()
+                    snapshot.cameras.update(resolved_cameras)
+
                 self._send_message(message)
             except Exception as exc:
                 self._record_error(exc)

@@ -11,7 +11,7 @@ import numpy as np
 @dataclass
 class CameraManagerConfig:
     enabled: bool = True
-    resolution: tuple[int, int] = (224, 224)
+    resolution: tuple[int, int] = (640, 480)
     publish_interval_frames: int = 2
     queue_size: int = 3
     log_errors: bool = True
@@ -20,7 +20,7 @@ class CameraManagerConfig:
     @classmethod
     def from_mapping(cls, values: dict | None):
         values = values or {}
-        resolution = values.get("resolution", (224, 224))
+        resolution = values.get("resolution", (640, 480))
         return cls(
             enabled=bool(values.get("enabled", True)),
             resolution=(int(resolution[0]), int(resolution[1])),
@@ -59,6 +59,8 @@ class CameraManager:
         self._current_viewport_index = 0
         self._frame_counter = 0
         self._camera_queue = queue.Queue(maxsize=self.config.queue_size)
+        import concurrent.futures
+        self._executor = concurrent.futures.ThreadPoolExecutor(max_workers=max(1, len(self.camera_specs)))
         self._thread_running = False
         self._publisher_thread = None
         self._annotators: dict[str, object] = {}
@@ -68,6 +70,18 @@ class CameraManager:
     @property
     def viewport_camera_names(self) -> list[str]:
         return [name for name, _ in self.viewport_cameras]
+
+    def _is_camera_needed(self, camera_name: str, return_frames: bool) -> bool:
+        if return_frames:
+            return True
+        if self.camera_publishers is not None:
+            try:
+                if hasattr(self.camera_publishers, "has_subscribers"):
+                    return self.camera_publishers.has_subscribers(camera_name)
+            except Exception:
+                pass
+            return True
+        return False
 
     def start(self):
         if not self.config.enabled or not self.camera_specs:
@@ -92,6 +106,12 @@ class CameraManager:
             annotator.attach([render_product])
             self._render_products[camera_name] = render_product
             self._annotators[camera_name] = annotator
+
+            needed = self._is_camera_needed(camera_name, return_frames=False)
+            try:
+                render_product.hydra_texture.set_updates_enabled(needed)
+            except Exception as exc:
+                self._record_error("set_updates_enabled_error", f"{camera_name}: {exc}")
 
         if not self._annotators:
             return self
@@ -120,31 +140,68 @@ class CameraManager:
             return {} if return_frames else None
 
         self._frame_counter += 1
-        if self._frame_counter % self.config.publish_interval_frames != 0:
-            return {} if return_frames else None
+        should_capture = (self._frame_counter % self.config.publish_interval_frames == 0)
+        
+        # When returning frames for recording, we rely on bimanual_runtime to 
+        # dynamically throttle the render rate. Therefore, we capture on every 
+        # rendered frame.
+        if return_frames:
+            should_capture = True
+        next_will_capture = ((self._frame_counter + 1) % self.config.publish_interval_frames == 0)
 
-        captured_frames: dict[str, np.ndarray] = {}
+        captured_frames: dict[str, object] = {}
+
+        def _process_gpu_data(cam_name, gpu_data, current_stamp):
+            try:
+                # Convert GPU data to CPU numpy array in background
+                if hasattr(gpu_data, "cpu"):
+                    cpu_data = gpu_data.cpu().numpy()
+                elif hasattr(gpu_data, "get"):
+                    cpu_data = gpu_data.get()
+                elif hasattr(gpu_data, "numpy"):
+                    cpu_data = gpu_data.numpy()
+                else:
+                    import numpy as np
+                    cpu_data = np.asarray(gpu_data)
+                
+                image_rgb = self._coerce_rgb(cam_name, cpu_data)
+                if image_rgb is not None:
+                    self.diagnostics.captured_frames += 1
+                    if self.camera_publishers is not None:
+                        try:
+                            self._camera_queue.put_nowait((cam_name, image_rgb, current_stamp))
+                        except queue.Full:
+                            self.diagnostics.dropped_frames += 1
+                            self._record_error("camera_queue_full", cam_name)
+                return cam_name, image_rgb
+            except Exception as exc:
+                self._record_error("capture_error", f"{cam_name}: {exc}")
+            return cam_name, None
 
         for camera_name, annotator in self._annotators.items():
-            try:
-                data = annotator.get_data()
-                if data is None:
-                    continue
+            needed = self._is_camera_needed(camera_name, return_frames)
 
-                image_rgb = self._coerce_rgb(camera_name, data)
-                if image_rgb is None:
-                    continue
+            if needed and should_capture:
+                gpu_data = None
+                try:
+                    gpu_data = annotator.get_data(device="cuda")
+                except TypeError:
+                    gpu_data = annotator.get_data()
+                
+                if gpu_data is not None:
+                    future = self._executor.submit(_process_gpu_data, camera_name, gpu_data, stamp)
+                    if return_frames:
+                        captured_frames[camera_name] = future
+                else:
+                    self._record_error("capture_empty", camera_name)
 
-                captured_frames[camera_name] = image_rgb
-                self.diagnostics.captured_frames += 1
-                if self.camera_publishers is not None:
-                    try:
-                        self._camera_queue.put_nowait((camera_name, image_rgb, stamp))
-                    except queue.Full:
-                        self.diagnostics.dropped_frames += 1
-                        self._record_error("camera_queue_full", camera_name)
-            except Exception as exc:
-                self._record_error("capture_error", f"{camera_name}: {exc}")
+            render_product = self._render_products.get(camera_name)
+            if render_product is not None:
+                next_state = needed
+                try:
+                    render_product.hydra_texture.set_updates_enabled(next_state)
+                except Exception as exc:
+                    self._record_error("set_updates_enabled_error", f"{camera_name}: {exc}")
 
         if return_frames:
             return captured_frames
@@ -189,6 +246,8 @@ class CameraManager:
 
         self._annotators.clear()
         self._render_products.clear()
+        if hasattr(self, "_executor"):
+            self._executor.shutdown(wait=False)
 
     def _publish_loop(self):
         while self._thread_running:
@@ -207,6 +266,8 @@ class CameraManager:
 
     def _coerce_rgb(self, camera_name: str, data) -> np.ndarray | None:
         image_array = np.asarray(data)
+        if image_array.size == 0:
+            return None
         if image_array.ndim != 3 or image_array.shape[2] not in (3, 4):
             self._record_error(
                 "unexpected_image_shape",

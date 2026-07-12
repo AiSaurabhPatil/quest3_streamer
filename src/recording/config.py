@@ -91,12 +91,12 @@ class RecordingCameraConfig:
     include: tuple[str, ...] = ()
     feature_prefix: str = "observation.images"
     dtype: str = "video"
-    resolution: tuple[int, int] = (224, 224)
+    resolution: tuple[int, int] = (640, 480)
 
     @classmethod
     def from_mapping(cls, values: dict[str, Any] | None):
         values = values or {}
-        resolution = values.get("resolution", (224, 224))
+        resolution = values.get("resolution", (640, 480))
         if len(resolution) != 2:
             raise ValueError("Recording camera resolution must contain [width, height]")
         width = int(resolution[0])
@@ -115,7 +115,7 @@ class RecordingCameraConfig:
 @dataclass(frozen=True)
 class RecordingConfig:
     enabled: bool = False
-    dataset_format: str = "v2.1"
+    dataset_format: str = "v3.0"
     root: str = "datasets"
     repo_id: str = "local/quest3-openarm"
     task: str = "Teleoperate OpenArm to complete the task"
@@ -144,6 +144,7 @@ class RecordingConfig:
     action: RecordingVectorConfig = field(
         default_factory=lambda: RecordingVectorConfig(key="action")
     )
+    deferred_rendering: bool = False
     cameras: RecordingCameraConfig = field(default_factory=RecordingCameraConfig)
 
     @classmethod
@@ -154,7 +155,7 @@ class RecordingConfig:
             root = os.path.join(project_root, root)
         config = cls(
             enabled=bool(values.get("enabled", False)),
-            dataset_format=str(values.get("dataset_format", "v2.1")),
+            dataset_format=str(values.get("dataset_format", "v3.0")),
             root=root,
             repo_id=str(values.get("repo_id", "local/quest3-openarm")),
             task=str(values.get("task", "Teleoperate OpenArm to complete the task")),
@@ -165,6 +166,7 @@ class RecordingConfig:
             start_after_calibration=bool(values.get("start_after_calibration", True)),
             auto_start_episode=bool(values.get("auto_start_episode", False)),
             use_videos=bool(values.get("use_videos", True)),
+            deferred_rendering=bool(values.get("deferred_rendering", False)),
             streaming_encoding=bool(values.get("streaming_encoding", True)),
             vcodec=str(values.get("vcodec", "auto")),
             encoder_threads=int(values.get("encoder_threads", min(4, max(1, cpu_count() or 1)))),

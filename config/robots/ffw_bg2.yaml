@@ -1,7 +1,7 @@
 robot_type: ffw_bg2
 display_name: "FFW BG2"
 articulation_name: "ffw_bg2"
-usd: "robot_configs/ffw_bg2_config/ffw_bg2_env.usd"
+usd: "robot_configs/ffw_bg2_config/ffw_bg2_env_v2.usd"
 urdf: "robot_configs/ffw_bg2_config/ffw_bg2.urdf"
 left_arm_config: "robot_configs/ffw_bg2_config/left_arm"
 right_arm_config: "robot_configs/ffw_bg2_config/right_arm"
@@ -59,7 +59,7 @@ grippers:
 
 cameras:
   head_camera:
-    prim_path: "/World/FFW_BG2/ffw_bg2_follower/head/head_camera"
+    prim_path: "/World/FFW_BG2/ffw_bg2_follower/head/head_link2/head_camera"
     topic: "/camera/head_camera/image_raw"
   left_wrist_camera:
     prim_path: "/World/FFW_BG2/ffw_bg2_follower/left_arm/arm_l_link7/left_wrist_camera"
@@ -123,31 +123,51 @@ domain_randomization:
   enabled: true
   seed: null
   settle_steps: 30
-  prims:
-    cube: "/World/Cube"
-    tray: "/World/Tray"
-    table: "/World/OakTableSmall"
-    light_root: "/Environment"
+  
+  objects:
+    bounds:
+      # If corner prims (/World/corner_01, etc.) exist on the stage, the randomizer fetches their
+      # positions at runtime to define the placement box. Otherwise, it falls back to:
+      reference_prim: "/World/Kitchen/background/benchmark_kitchen_island_000"
+      center_area_scale: [0.8, 0.8]
+      fallback_table_bounds_m:
+        x: [-0.4, 0.4]
+        y: [-0.3, 0.3]
+    
+    # Minimum clearance/distance constraint to prevent objects from colliding
+    min_distance_m: 0.18
+    
+    # List of randomized objects with their footprint/collision properties
+    items:
+      - path: "/World/Bowl"
+        radius_m: 0.11
+        yaw_deg: [-30.0, 30.0]
+        z_offset_m: 0.0
+      - path: "/World/Apple"
+        radius_m: 0.05
+        yaw_deg: [-180.0, 180.0]
+        z_offset_m: 0.0
+
   lighting:
-    distant_light_path: "/Environment/RandomizedDistantLight"
-    distant_light_base_intensity: 3500.0
-    distant_light_angle: 1.0
-    dome_light_intensity: 0.0
-    intensity: [1800.0, 6500.0]
-    exposure_jitter: [-0.1, 0.1]
-    direction_deg:
-      x: [35.0, 75.0]
-      y: [-25.0, 25.0]
-      z: [-180.0, 180.0]
-  placement:
-    table_center_area_scale: [0.6, 0.6]
-    boundary_margin_m: 0.025
-    object_gap_m: 0.035
-    cube_radius_m: 0.035
-    tray_radius_m: 0.16
-    min_center_distance_m: 0.22
-    cube_yaw_deg: [-180.0, 180.0]
-    tray_yaw_deg: [-20.0, 20.0]
-    fallback_table_bounds_m:
-      x: [-0.35, 0.35]
-      y: [-0.28, 0.28]
+    # List of lights to randomize (RectLights)
+    lights:
+      - path: "/World/Kitchen/light/RectLight"
+        intensity: [0.0, 15000.0]
+        exposure_jitter: [-0.5, 0.5]
+        color_temperature: [4500.0, 7000.0]
+      - path: "/World/Kitchen/light/RectLight_01"
+        intensity: [0.0, 15000.0]
+        exposure_jitter: [-0.5, 0.5]
+        color_temperature: [4500.0, 7000.0]
+      - path: "/World/Kitchen/light/RectLight_02"
+        intensity: [0.0, 15000.0]
+        exposure_jitter: [-0.5, 0.5]
+        color_temperature: [4500.0, 7000.0]
+      - path: "/World/Kitchen/light/RectLight_03"
+        intensity: [0.0, 15000.0]
+        exposure_jitter: [-0.5, 0.5]
+        color_temperature: [4500.0, 7000.0]
+      - path: "/World/Kitchen/light/RectLight_04"
+        intensity: [0.0, 15000.0]
+        exposure_jitter: [-0.5, 0.5]
+        color_temperature: [4500.0, 7000.0]

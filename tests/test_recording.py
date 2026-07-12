@@ -34,7 +34,7 @@ class RecordingTests(unittest.TestCase):
         )
 
         self.assertTrue(config.enabled)
-        self.assertEqual(config.dataset_format, "v2.1")
+        self.assertEqual(config.dataset_format, "v3.0")
         self.assertEqual(config.root, os.path.join(PROJECT_ROOT, "datasets/test"))
         self.assertEqual(config.buttons.save_episode, "left_primary")
         self.assertEqual(config.buttons.start_episode, "left_secondary")

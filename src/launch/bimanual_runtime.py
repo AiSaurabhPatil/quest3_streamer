@@ -35,6 +35,11 @@ class RecordingLoopState:
     last_saved_reported: int = 0
     last_discarded_reported: int = 0
     last_progress_report_s: float = 0.0
+    # Holds the domain randomization sample for the current episode.
+    # Set when the scene is reset (domain randomization fires) and passed to
+    # save_episode_async() so each episode's scene config can be replayed
+    # faithfully during deferred rendering.
+    domain_randomization_sample: object | None = None
 
     def has_reached_target(self, saved_episodes: int) -> bool:
         return self.target_episodes is not None and saved_episodes >= self.target_episodes
@@ -70,6 +75,9 @@ def run_bimanual_runtime(
     quiet_recording = recording_settings.enabled and not recording_settings.verbose
     if quiet_recording:
         isaac_config = _with_quiet_isaac_logging(isaac_config)
+    if recording_settings is not None and recording_settings.enabled:
+        isaac_config = _with_optimized_recording_settings(isaac_config)
+
     isaac_app = IsaacApp(isaac_config)
 
     rclpy = None
@@ -240,6 +248,20 @@ def _with_quiet_isaac_logging(isaac_config: dict) -> dict:
     quiet_config["simulation"] = simulation
     return quiet_config
 
+def _with_optimized_recording_settings(isaac_config: dict) -> dict:
+    config = dict(isaac_config)
+    simulation = dict(config.get("simulation", {}))
+    extra_args = list(simulation.get("extra_args", []))
+    for arg in (
+        "--/rtx/post/dlss/execMode=0",
+        "--/rtx/post/aa/op=0",
+    ):
+        if arg not in extra_args:
+            extra_args.append(arg)
+    simulation["extra_args"] = extra_args
+    config["simulation"] = simulation
+    return config
+
 
 def _initialize_ik(adapter: OpenArmAdapter) -> bool:
     try:
@@ -340,6 +362,10 @@ def _run_control_loop(
         target_episodes=recording_settings.max_episodes,
         recording_active=recording_settings.auto_start_episode and recorder is not None,
     )
+    # Initialize rendering step counter and episode tracking variables.
+    adapter._render_step_counter = 0
+    episode_step_counter = 0
+    record_every_n_steps = max(1, round(target_control_rate_hz / recording_settings.fps)) if recorder is not None else 1
 
     # Real-time control-loop pacing. The physics+IK loop is decoupled from the
     # render frame time: it advances at up to target_control_rate_hz while
@@ -452,26 +478,59 @@ def _run_control_loop(
             stamp = controller_provider.get_clock().now().to_msg()
             joint_state_publisher.publish(dof_names, action.joint_positions, stamp=stamp)
 
+            # Determine if this step should record a frame to match the target recording FPS
+            if recorder is not None and recording_state.recording_active:
+                episode_step_counter += 1
+                will_record = ((episode_step_counter - 1) % record_every_n_steps) == 0
+            else:
+                episode_step_counter = 0
+                will_record = False
+
             # Decide once whether this iteration will render, then reuse the
             # decision for camera capture and the sim step. Camera capture is
             # gated on `will_render` so it only runs when fresh pixels exist.
-            will_render = _advance_render_counter(adapter, render_every_n_steps)
+            current_render_steps = render_every_n_steps
+            if recorder is not None and recording_state.recording_active:
+                if not recording_settings.deferred_rendering:
+                    # Dynamically throttle rendering to maintain control loop speed 
+                    # against the heavy GPU load of rendering 4 recording cameras.
+                    # Align rendering steps with recording steps to guarantee we render when recording.
+                    current_render_steps = max(render_every_n_steps, record_every_n_steps)
+
+            will_render = _advance_render_counter(adapter, current_render_steps)
+            
+            # If deferred rendering is ON, we do not ask camera_manager for frames, 
+            # keeping Replicator updates disabled.
+            fetch_real_frames = (
+                recorder is not None 
+                and recording_state.recording_active 
+                and not recording_settings.deferred_rendering
+            )
             camera_frames = camera_manager.update(
                 stamp=stamp,
-                return_frames=recorder is not None,
+                return_frames=fetch_real_frames,
                 rendered=will_render,
-            )
+            ) or {}
 
             if recorder is not None and recording_schema is not None and recording_state.recording_active:
-                _maybe_record_frame(
-                    adapter=adapter,
-                    recorder=recorder,
-                    recording_settings=recording_settings,
-                    recording_schema=recording_schema,
-                    current_positions=current_positions,
-                    action=action,
-                    camera_frames=camera_frames or {},
-                )
+                if will_record:
+                    if recording_settings.deferred_rendering:
+                        import numpy as np
+                        res = recording_settings.cameras.resolution
+                        # Inject dummy black frames to satisfy LeRobotDataset schema
+                        camera_frames = {
+                            spec.camera_name: np.zeros((res[1], res[0], 3), dtype=np.uint8)
+                            for spec in recording_schema.camera_specs
+                        }
+                    _maybe_record_frame(
+                        adapter=adapter,
+                        recorder=recorder,
+                        recording_settings=recording_settings,
+                        recording_schema=recording_schema,
+                        current_positions=current_positions,
+                        action=action,
+                        camera_frames=camera_frames or {},
+                    )
                 _maybe_print_recording_frame_progress(
                     recording_state,
                     recorder,
@@ -526,7 +585,7 @@ def _advance_render_counter(adapter: OpenArmAdapter, render_every_n_steps: int) 
     """
     counter = getattr(adapter, "_render_step_counter", 0) + 1
     adapter._render_step_counter = counter
-    return (counter % render_every_n_steps) == 0
+    return ((counter - 1) % render_every_n_steps) == 0
 
 
 def _log_session_events(events, controller_provider, *, enabled: bool = True) -> None:
@@ -569,7 +628,15 @@ def _handle_button_events(
             recording_state.awaiting_save_completion = True
             if verbose_recording:
                 print(f"[Recording] Save requested for {recording_state.next_episode_label(recorder.diagnostics.saved_episodes)}")
-            recorder.save_episode_async(reason="quest_x")
+            # Serialize and pass the current episode's domain randomization state.
+            dr_dict = None
+            if recording_state.domain_randomization_sample is not None:
+                try:
+                    dr_dict = recording_state.domain_randomization_sample.to_dict()
+                except Exception:
+                    pass
+            recorder.save_episode_async(reason="quest_x", domain_randomization=dr_dict)
+            recording_state.domain_randomization_sample = None
     if button_events.start_episode and recorder is not None:
         if not session_ready:
             if verbose_recording:
@@ -585,6 +652,7 @@ def _handle_button_events(
                 print(f"[Recording] Episode target already reached: {recording_state.progress_text(recorder.diagnostics.saved_episodes)}")
         else:
             recording_state.recording_active = True
+            adapter._render_step_counter = 0
             if verbose_recording:
                 print(f"[Recording] Started {recording_state.next_episode_label(recorder.diagnostics.saved_episodes)}")
     if button_events.reset_scene:
@@ -595,7 +663,9 @@ def _handle_button_events(
             recorder.discard_episode_async(reason="scene_reset")
         if verbose_recording:
             print("[Scene] Reset requested")
-        _reset_scene(isaac_app, adapter, teleop_session, domain_randomizer, verbose=verbose_recording)
+        new_sample = _reset_scene(isaac_app, adapter, teleop_session, domain_randomizer, verbose=verbose_recording)
+        # Store the new randomization sample so save_episode_async can persist it.
+        recording_state.domain_randomization_sample = new_sample
         return True
     return False
 
@@ -715,7 +785,14 @@ def _reset_scene(
     domain_randomizer: DomainRandomizer | None = None,
     *,
     verbose: bool = True,
-) -> None:
+) -> object:
+    """Reset the scene and optionally apply domain randomization.
+
+    Returns the ``DomainRandomizationSample`` produced by the randomizer (if
+    enabled) so callers can persist it alongside the episode data for faithful
+    replay during deferred rendering. Returns ``None`` when randomization is
+    disabled.
+    """
     adapter.reset_runtime_state()
     teleop_session.reset(preserve_calibration=True)
 
@@ -736,28 +813,43 @@ def _reset_scene(
     isaac_app.reset_world()
 
     if sample is not None and verbose:
-        cube_pose = getattr(sample, "cube_pose", None)
-        tray_pose = getattr(sample, "tray_pose", None)
         missing_prims = getattr(sample, "missing_prims", ())
         if missing_prims:
             print(
                 "[Scene] Randomization skipped: "
                 f"missing_prims={list(missing_prims)}, "
-                f"light_intensity={sample.light_intensity}"
-            )
-        elif cube_pose is not None or tray_pose is not None:
-            print(
-                "[Scene] Randomized: "
-                f"cube_position={cube_pose[0] if cube_pose else None}, "
-                f"tray_position={tray_pose[0] if tray_pose else None}, "
-                f"light_intensity={sample.light_intensity}"
+                f"light_intensity={getattr(sample, 'light_intensity', None)}"
             )
         else:
-            print(
-                "[Scene] Randomized: "
-                f"nuts={sample.nut_count}, bolts={sample.bolt_count}, "
-                f"light_intensity={sample.light_intensity}, floor_color={sample.floor_color}"
-            )
+            # Dynamically summarize object poses
+            tray_poses = getattr(sample, "tray_poses", {})
+            if tray_poses:
+                poses_summary = {
+                    path.split("/")[-1]: [round(v, 4) for v in pose["position"]]
+                    for path, pose in tray_poses.items()
+                }
+                print(
+                    "[Scene] Randomized: "
+                    f"objects={poses_summary}, "
+                    f"light_intensity={getattr(sample, 'light_intensity', None)}, "
+                    f"floor_color={getattr(sample, 'floor_color', None)}"
+                )
+            else:
+                cube_pose = getattr(sample, "cube_pose", None)
+                tray_pose = getattr(sample, "tray_pose", None)
+                if cube_pose is not None or tray_pose is not None:
+                    print(
+                        "[Scene] Randomized: "
+                        f"cube_position={cube_pose[0] if cube_pose else None}, "
+                        f"tray_position={tray_pose[0] if tray_pose else None}, "
+                        f"light_intensity={sample.light_intensity}"
+                    )
+                else:
+                    print(
+                        "[Scene] Randomized: "
+                        f"nuts={getattr(sample, 'nut_count', 0)}, bolts={getattr(sample, 'bolt_count', 0)}, "
+                        f"light_intensity={getattr(sample, 'light_intensity', None)}, floor_color={getattr(sample, 'floor_color', None)}"
+                    )
 
     # Let newly spawned physics objects settle into place now that the scene is
     # running again. Done AFTER reset_world so the spawned bodies actually exist
@@ -774,6 +866,8 @@ def _reset_scene(
     if hasattr(adapter, "reinitialize_physics_handles"):
         adapter.reinitialize_physics_handles()
         isaac_app.step(render=True)
+
+    return sample
 
 
 def _handle_not_ready(

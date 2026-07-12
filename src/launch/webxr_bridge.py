@@ -137,22 +137,37 @@ class UnifiedLogger:
         else:
             self._logger = None
 
+    def _should_use_ros(self) -> bool:
+        if self._ros_node is None:
+            return False
+        try:
+            import rclpy
+            return rclpy.ok()
+        except ImportError:
+            return False
+
     def info(self, message: str) -> None:
-        if self._ros_node is not None:
+        if self._should_use_ros():
             self._ros_node.get_logger().info(message)
         else:
+            if self._logger is None:
+                self._logger = logging.getLogger("webxr_ros_bridge")
             self._logger.info(message)
 
     def warn(self, message: str) -> None:
-        if self._ros_node is not None:
+        if self._should_use_ros():
             self._ros_node.get_logger().warn(message)
         else:
+            if self._logger is None:
+                self._logger = logging.getLogger("webxr_ros_bridge")
             self._logger.warning(message)
 
     def error(self, message: str) -> None:
-        if self._ros_node is not None:
+        if self._should_use_ros():
             self._ros_node.get_logger().error(message)
         else:
+            if self._logger is None:
+                self._logger = logging.getLogger("webxr_ros_bridge")
             self._logger.error(message)
 
 
@@ -239,7 +254,8 @@ class BridgeRuntime:
         self.logger = logger
         self.ros_node = ros_node
         self.forwarder = forwarder
-        self.metrics = TransportMetricsTracker(label=mode, log_period_s=metrics_log_period_s)
+        self.metrics_log_period_s = metrics_log_period_s
+        self.metrics = TransportMetricsTracker(label=mode, log_period_s=max(0.25, metrics_log_period_s))
 
     def on_client_connected(self, client_addr) -> None:
         self.metrics.reset()
@@ -263,12 +279,13 @@ class BridgeRuntime:
             receive_monotonic_s=receive_monotonic_s,
             receive_epoch_ms=receive_epoch_ms,
         )
-        snapshot = self.metrics.maybe_snapshot(receive_monotonic_s)
-        if snapshot is not None:
-            log_line = snapshot.format_log_line()
-            if self.forwarder is not None and self.forwarder.queue_drops > 0:
-                log_line += f" forward_queue_drop={self.forwarder.queue_drops}"
-            self.logger.info(log_line)
+        if self.metrics_log_period_s > 0:
+            snapshot = self.metrics.maybe_snapshot(receive_monotonic_s)
+            if snapshot is not None:
+                log_line = snapshot.format_log_line()
+                if self.forwarder is not None and self.forwarder.queue_drops > 0:
+                    log_line += f" forward_queue_drop={self.forwarder.queue_drops}"
+                self.logger.info(log_line)
 
         if self.ros_node is not None:
             self.ros_node.publish_packet(packet)
