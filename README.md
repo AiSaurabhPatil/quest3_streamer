@@ -21,7 +21,26 @@ TeleSim streams 6-DoF controller poses from a **WebXR-compatible VR headset** ov
 
 ---
 
+## Demo
+
+<table>
+  <tr>
+    <td align="center" width="33%">
+      <img src="teleop_gifs/telesim_1.gif" width="100%" alt="TeleSim Teleop Demo 1"/>
+    </td>
+    <td align="center" width="33%">
+      <img src="teleop_gifs/telesim_2.gif" width="100%" alt="TeleSim Teleop Demo 2"/>
+    </td>
+    <td align="center" width="33%">
+      <img src="teleop_gifs/telesim_3.gif" width="100%" alt="TeleSim Teleop Demo 3"/>
+    </td>
+  </tr>
+</table>
+
+---
+
 ## System Architecture
+
 
 ```mermaid
 flowchart TD
