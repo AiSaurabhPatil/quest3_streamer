@@ -173,7 +173,7 @@ The robot will hold its last successful position when IK fails.
 2. **Sourced system ROS before Isaac Sim**:
    ```bash
    # DON'T do this before running Isaac Sim scripts:
-   source /opt/ros/humble/setup.bash
+   source /opt/ros/jazzy/setup.bash  # or humble depending on your distro
    
    # Isaac Sim has its own ROS setup
    ```

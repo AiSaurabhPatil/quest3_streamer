@@ -283,7 +283,7 @@ class FFWBG2RandomizerDecoupleTests(unittest.TestCase):
         randomizer = FFWBG2DomainRandomizer(stage, config)
         # Stub USD-touching helpers (need pxr / a real stage); the contract
         # under test is the apply/settle split only.
-        randomizer._randomize_lighting = lambda: 500.0
+        randomizer._randomize_lighting = lambda: (500.0, None)
         randomizer._randomize_cube_and_tray = lambda: (None, None, ())
         steps = []
         sample = randomizer.apply_randomization()

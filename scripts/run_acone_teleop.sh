@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Set environment variables for Isaac Sim internal ROS 2 Bridge
-export ROS_DISTRO=humble
+export ROS_DISTRO="${ROS_DISTRO:-jazzy}"
 export RMW_IMPLEMENTATION=rmw_fastrtps_cpp
 
 # Get project root directory (parent of scripts/)
@@ -21,7 +21,7 @@ config_value() {
 
 ISAAC_SIM_PATH="${ISAAC_SIM_PATH:-$(config_value paths.isaac_sim)}"
 export ISAAC_SIM_PATH
-export LD_LIBRARY_PATH="${LD_LIBRARY_PATH:+$LD_LIBRARY_PATH:}$ISAAC_SIM_PATH/exts/isaacsim.ros2.bridge/humble/lib"
+export LD_LIBRARY_PATH="${LD_LIBRARY_PATH:+$LD_LIBRARY_PATH:}$ISAAC_SIM_PATH/exts/isaacsim.ros2.core/$ROS_DISTRO/lib"
 
 recording_requested() {
     local config_recording_enabled
@@ -108,8 +108,8 @@ has_webrtc_arg() {
 
 EXTRA_ARGS=()
 if ! has_webrtc_arg "$@"; then
-    EXTRA_ARGS+=(--webrtc)
-    echo "[WebRTC] Isaac Sim streaming enabled by default. Connect with Isaac Sim WebRTC client to this host on port 49100."
+    EXTRA_ARGS+=(--no-webrtc)
+    echo "[GUI] Isaac Sim windowed GUI enabled by default."
 fi
 
 cd "$PROJECT_ROOT"

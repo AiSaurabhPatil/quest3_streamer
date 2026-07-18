@@ -140,14 +140,14 @@ free_port "$PORT_HTTPS"
 
 # ---------------------------------------------------------------------------
 # Locate Isaac Sim and its bundled rclpy
-# Isaac Sim 6.0 bundles rclpy under exts/isaacsim.ros2.core/humble/rclpy
+# Isaac Sim 6.0 bundles rclpy under exts/isaacsim.ros2.core/jazzy/rclpy (and humble/rclpy)
 # We need both PYTHONPATH and LD_LIBRARY_PATH set so the bridge can use rclpy
 # without requiring a system ROS installation.
 # ---------------------------------------------------------------------------
 ISAAC_SIM_PATH="${ISAAC_SIM_PATH:-$(config_value paths.isaac_sim)}"
 ISAAC_SIM_PATH="${ISAAC_SIM_PATH:-/home/saurabh/isaac_sim}"
 
-ROS_DISTRO="${ROS_DISTRO:-humble}"
+ROS_DISTRO="${ROS_DISTRO:-jazzy}"
 
 ISAAC_RCLPY_PATH="$ISAAC_SIM_PATH/exts/isaacsim.ros2.core/${ROS_DISTRO}/rclpy"
 ISAAC_ROS_LIB_PATH="$ISAAC_SIM_PATH/exts/isaacsim.ros2.core/${ROS_DISTRO}/lib"

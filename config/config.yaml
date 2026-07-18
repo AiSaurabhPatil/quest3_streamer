@@ -65,17 +65,6 @@ isaac:
     - "Properties"
     - "Semantics"
     - "Visual Scripting"
-  # --- Control-loop pacing (ultra-low-latency) ---
-  # The control loop (physics + IK) runs at up to target_control_rate_hz while
-  # rendering is throttled to one render every render_every_n_steps. This
-  # decouples control latency from the render frame time, which is the dominant
-  # per-iteration cost. Works in windowed GUI mode (the LAN default) and
-  # headless/WebRTC mode alike.
-  #   target_control_rate_hz: max control+physics rate (Hz). The loop self-paces
-  #     and falls back gracefully if a frame overruns.
-  #   render_every_n_steps: render only every Nth physics step. Set to 1 to
-  #     render every step (legacy behavior). Higher N = faster control loop,
-  #     lower on-screen fps. N=2 is a good starting point for the windowed GUI.
   target_control_rate_hz: 60
   render_every_n_steps: 1
 
@@ -109,28 +98,4 @@ recording:
     save_episode: "left_primary"
     start_episode: "left_secondary"
 
-# Teleoperation safety configuration
-teleop:
-  calibration_samples: 30
-  position_scale: [1.0, 1.0, 1.0]
-  workspace_center: [0.3, 0.0, 0.3]
-  smoothing:
-    # Rate-invariant time-constant smoothing (preferred). tau_s is the
-    # exponential time constant; alpha = exp(-dt/tau) each step, so the
-    # smoothing *feel* stays constant even when the loop rate changes (e.g.
-    # when physics is decoupled from rendering). ~0.10 s reproduces the old
-    # alpha=0.9 feel at 60 Hz but stays stable at 120 Hz.
-    # Leave commented to fall back to the legacy per-step position_alpha below.
-    position_tau_s: 0.10
-    orientation_tau_s: 0.10
-    # Legacy per-step alpha (0..1). Used only when *_tau_s is unset.
-    position_alpha: 0.9
-    orientation_alpha: 0.9
-  deadman_timeout_ms: 500
-  hard_timeout_ms: 1000
-  max_target_jump_m: 0.25
-  max_target_velocity_mps: 0.8
-  # How quickly motion re-engages after a stale/deadman recovery (0..1). Higher
-  # = snappier re-engage. The main loop is now faster, so a quicker recovery is
-  # safe and avoids the "sluggish after a hiccup" feel.
-  stale_recovery_alpha: 0.5
+

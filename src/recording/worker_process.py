@@ -9,9 +9,8 @@ import shutil
 import sys
 import traceback
 
-from .async_worker import RecorderDiagnostics
+from .snapshots import RecorderDiagnostics, RecordingFrameSnapshot
 from .ipc import IPCClosedError, receive_message, send_message
-from .snapshots import RecordingFrameSnapshot
 
 
 class LeRobotWorkerProcess:

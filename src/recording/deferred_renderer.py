@@ -175,12 +175,8 @@ def main(argv=None):
             try:
                 dr_config = runtime.robot.get("domain_randomization", {})
                 print(f"[Renderer Debug] Loaded dr_config: {dr_config}")
-                if args.robot_type == "ffw_bg2":
-                    from src.isaac_backend.ffw_bg2_domain_randomization import FFWBG2DomainRandomizer
-                    domain_randomizer = FFWBG2DomainRandomizer(world.stage, dr_config)
-                else:
-                    from src.isaac_backend.domain_randomization import DomainRandomizer
-                    domain_randomizer = DomainRandomizer(world.stage, dr_config)
+                from src.isaac_backend.domain_randomization import DomainRandomizer
+                domain_randomizer = DomainRandomizer(world.stage, dr_config)
                 domain_randomizer.initialize()
                 print(f"[Renderer] Domain randomizer initialized for scene replay. Enabled: {domain_randomizer.enabled}")
             except Exception as exc:

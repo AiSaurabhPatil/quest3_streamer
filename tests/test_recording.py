@@ -38,7 +38,7 @@ class RecordingTests(unittest.TestCase):
         self.assertEqual(config.root, os.path.join(PROJECT_ROOT, "datasets/test"))
         self.assertEqual(config.buttons.save_episode, "left_primary")
         self.assertEqual(config.buttons.start_episode, "left_secondary")
-        self.assertEqual(config.cameras.resolution, (224, 224))
+        self.assertEqual(config.cameras.resolution, (640, 480))
 
     def test_button_edge_mapper_only_emits_rising_edges(self):
         mapper = ButtonEdgeMapper(RecordingConfig.from_mapping({}, project_root=PROJECT_ROOT).buttons)
@@ -67,8 +67,10 @@ class RecordingTests(unittest.TestCase):
         self.assertFalse(released.save_episode)
 
     def test_v21_recording_prefers_dedicated_worker_python(self):
+        from unittest.mock import patch
         config = RecordingConfig.from_mapping({"dataset_format": "v2.1"}, project_root=PROJECT_ROOT)
-        recorder = LeRobotEpisodeRecorder(config=config, schema=None, robot_type="openarm", project_root=PROJECT_ROOT)
+        with patch("os.path.exists", return_value=True):
+            recorder = LeRobotEpisodeRecorder(config=config, schema=None, robot_type="openarm", project_root=PROJECT_ROOT)
 
         self.assertTrue(recorder.worker_process.python.endswith(".venv-lerobot-v21/bin/python"))
 
@@ -91,7 +93,7 @@ class RecordingTests(unittest.TestCase):
         self.assertEqual(schema.state_spec.names[7], "left_gripper")
         self.assertEqual(schema.state_spec.names[-1], "right_gripper")
         self.assertEqual(len(schema.camera_specs), 3)
-        self.assertEqual(schema.camera_specs[0].shape, (3, 224, 224))
+        self.assertEqual(schema.camera_specs[0].shape, (3, 480, 640))
 
     def test_openarm_recording_vector_normalizes_grippers(self):
         runtime = load_runtime_config(project_root=PROJECT_ROOT, robot="openarm")

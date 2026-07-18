@@ -76,7 +76,7 @@ class LaunchPhase9Tests(unittest.TestCase):
         self.assertEqual(recording_config["repo_id"], "local/quest3-acone")
         self.assertEqual(
             recording_config["cameras"]["include"],
-            ["head_camera", "left_wrist_camera", "right_wrist_camera"],
+            ["head_camera", "left_wrist_camera", "right_wrist_camera", "perspective_camera"],
         )
 
     def test_acone_webrtc_forces_headless_streaming_experience(self):
@@ -107,7 +107,7 @@ class LaunchPhase9Tests(unittest.TestCase):
         self.assertEqual(recording_config["repo_id"], "local/quest3-ffw-bg2")
         self.assertEqual(
             recording_config["cameras"]["include"],
-            ["head_camera", "left_wrist_camera", "right_wrist_camera"],
+            ["head_camera", "left_wrist_camera", "right_wrist_camera", "perspective_camera"],
         )
 
     def test_ffw_bg2_launcher_rejects_non_ffw_bg2_robot(self):

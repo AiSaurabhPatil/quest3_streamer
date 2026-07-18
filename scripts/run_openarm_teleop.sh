@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Set environment variables for Isaac Sim internal ROS 2 Bridge
-export ROS_DISTRO=humble
+export ROS_DISTRO="${ROS_DISTRO:-jazzy}"
 export RMW_IMPLEMENTATION=rmw_fastrtps_cpp
 
 # Get project root directory (parent of scripts/)
@@ -20,7 +20,7 @@ config_value() {
 }
 
 ISAAC_SIM_PATH="${ISAAC_SIM_PATH:-$(config_value paths.isaac_sim)}"
-export LD_LIBRARY_PATH="${LD_LIBRARY_PATH:+$LD_LIBRARY_PATH:}$ISAAC_SIM_PATH/exts/isaacsim.ros2.bridge/humble/lib"
+export LD_LIBRARY_PATH="${LD_LIBRARY_PATH:+$LD_LIBRARY_PATH:}$ISAAC_SIM_PATH/exts/isaacsim.ros2.core/$ROS_DISTRO/lib"
 
 recording_requested() {
     local config_recording_enabled

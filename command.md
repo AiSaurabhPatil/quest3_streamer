@@ -82,6 +82,9 @@ python3 web/https_server.py 8000 --cert certs/cert.pem --key certs/key.pem
 ```sh
 cd /mnt/external/saurabh_data/Developement/quest3_streamer
 source .venv/bin/activate
+# Export paths to use Isaac Sim's bundled rclpy (since system ROS is not installed)
+export PYTHONPATH="/home/saurabh/isaac_sim/exts/isaacsim.ros2.core/jazzy/rclpy:$PYTHONPATH"
+export LD_LIBRARY_PATH="/home/saurabh/isaac_sim/exts/isaacsim.ros2.core/jazzy/lib:$LD_LIBRARY_PATH"
 python3 -m src.launch.webxr_bridge \
   --mode direct \
   --host 0.0.0.0 \
@@ -93,7 +96,7 @@ python3 -m src.launch.webxr_bridge \
 #### Terminal 3 — Robot teleop (Isaac Sim)
 ```sh
 cd /mnt/external/saurabh_data/Developement/quest3_streamer
-bash scripts/run_acone_teleop.sh
+bash scripts/run_ffw_bg2_teleop.sh
 ```
 
 ---
@@ -111,7 +114,11 @@ cd /mnt/external/saurabh_data/Developement/quest3_streamer
   --recording-fps 30 \
   --max-episodes 10
 ```
-
+### deferred rendering of episode
+```sh
+cd /mnt/external/saurabh_data/Developement/quest3_streamer
+./scripts/run_deferred_renderer.sh local/quest3-acone local/quest3-acone-rendered_v2 --robot-type acone
+```
 ---
 
 ---
@@ -145,7 +152,7 @@ python3 web/https_server.py 8000 --cert certs/cert.pem --key certs/key.pem
 ```sh
 cd /home/saurabh/Development/quest3_streamer
 source .venv/bin/activate
-source /opt/ros/humble/setup.bash
+source /opt/ros/jazzy/setup.bash
 python3 -m src.launch.webxr_bridge \
   --mode remote-receiver \
   --host 0.0.0.0 \
@@ -183,3 +190,6 @@ source .venv-lerobot-v21/bin/activate
   --root datasets/local/quest3-acone \
   --episode-index 0
 ```
+
+
+#### 

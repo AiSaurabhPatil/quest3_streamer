@@ -1,7 +1,7 @@
 robot_type: ffw_bg2
 display_name: "FFW BG2"
 articulation_name: "ffw_bg2"
-usd: "robot_configs/ffw_bg2_config/ffw_bg2_env_v2.usd"
+usd: "robot_configs/ffw_bg2_config/Collected_ffw_bg2_env_v2/ffw_bg2_env_v2.usd"
 urdf: "robot_configs/ffw_bg2_config/ffw_bg2.urdf"
 left_arm_config: "robot_configs/ffw_bg2_config/left_arm"
 right_arm_config: "robot_configs/ffw_bg2_config/right_arm"
@@ -24,8 +24,6 @@ left_arm:
     - "arm_l_joint6"
     - "arm_l_joint7"
   preferred_config: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-  workspace_offset: [0.0, 0.2275, 0.0]
-  home_orientation: [1.0, 0.0, 0.0, 0.0]
 
 right_arm:
   frame_name: "right_tcp"
@@ -38,8 +36,6 @@ right_arm:
     - "arm_r_joint6"
     - "arm_r_joint7"
   preferred_config: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-  workspace_offset: [0.0, -0.2275, 0.0]
-  home_orientation: [1.0, 0.0, 0.0, 0.0]
 
 grippers:
   open_position: 0.0
@@ -67,23 +63,28 @@ cameras:
   right_wrist_camera:
     prim_path: "/World/FFW_BG2/ffw_bg2_follower/right_arm/arm_r_link7/right_wrist_camera"
     topic: "/camera/right_wrist_camera/image_raw"
+  perspective_camera:
+    prim_path: "/OmniverseKit_Persp"
+    topic: "/camera/perspective_camera/image_raw"
 
 ik:
   orientation_mode: "full_pose"
-  target_position_offset: [-0.0055, 0.0, -1.4316]
-  position_tolerance: 0.003
-  orientation_tolerance: 0.25
   orientation_fallback_to_position: true
-  max_ik_joint_step_rad: 0.12
 
 teleop:
-  workspace_center: [0.0055, 0.0, 0.8286]
-  position_scale: [1.0, 1.0, 1.0]
   calibration_samples: 30
+  position_scale: [1.0, 1.0, 1.0]
+  workspace_center: [0.3, 0.0, 0.3]
+  smoothing:
+    position_tau_s: 0.10
+    orientation_tau_s: 0.10
+    position_alpha: 0.9
+    orientation_alpha: 0.9
   deadman_timeout_ms: 1000
   hard_timeout_ms: 1000
   max_target_jump_m: 0.50
   max_target_velocity_mps: 1.5
+  stale_recovery_alpha: 0.5
 
 recording:
   robot_type: ffw_bg2

@@ -1,6 +1,6 @@
 robot_type: openarm
-usd: "robot_configs/openarm_config/openarm_bimanual/openarm_bimanual_env.usd"
-urdf: "robot_configs/openarm_config/openarm_bimanual_stl.urdf"
+usd: "robot_configs/openarm_config/Collected_openarm_bimanual_env/openarm_bimanual_env.usd"
+urdf: "robot_configs/openarm_config/openarm_bimanual.urdf"
 left_arm_config: "robot_configs/openarm_config/left_arm"
 right_arm_config: "robot_configs/openarm_config/right_arm"
 
@@ -21,8 +21,6 @@ left_arm:
     - "openarm_left_joint6"
     - "openarm_left_joint7"
   preferred_config: [0.0, -1.0, 0.0, 1.2, 0.0, 0.0, 0.0]
-  workspace_offset: [0.0, 0.15, 0.0]
-
 right_arm:
   frame_name: "openarm_right_hand"
   joints:
@@ -34,10 +32,8 @@ right_arm:
     - "openarm_right_joint6"
     - "openarm_right_joint7"
   preferred_config: [0.0, 1.0, 0.0, 1.2, 0.0, 0.0, 0.0]
-  workspace_offset: [0.0, -0.15, 0.0]
-
 grippers:
-  open_position: 0.044
+  open_position: 0.04
   closed_position: 0
   speed: 0.05
   threshold: 0.5
@@ -67,7 +63,11 @@ cameras:
     topic: "/camera/left_wrist_camera/image_raw"
   wrist_right:
     prim_path: "/World/openarm_bimanual/openarm_right_link7/right_wrist_camera"
-    topic: "/camera/right_wrist_camera/image_raw"
+    topic: "/camera/right_wrist_camera/image_raw" 
+  perspective_camera:
+    prim_path: "/OmniverseKit_Persp"
+    topic: "/camera/perspective_camera/image_raw"
+
 
 recording:
   robot_type: openarm
@@ -102,3 +102,52 @@ recording:
       name: "right_gripper"
       value: "normalized_gripper"
       side: "right"
+
+teleop:
+  calibration_samples: 30
+  position_scale: [1.0, 1.0, 1.0]
+  workspace_center: [0.3, 0.0, 0.3]
+  smoothing:
+    position_tau_s: 0.10
+    orientation_tau_s: 0.10
+    position_alpha: 0.9
+    orientation_alpha: 0.9
+  deadman_timeout_ms: 500
+  hard_timeout_ms: 1000
+  max_target_jump_m: 0.25
+  max_target_velocity_mps: 0.8
+  stale_recovery_alpha: 0.5
+
+# domain_randomization:
+#   enabled: true
+#   seed: null
+#   settle_steps: 30
+#   objects:
+#     bounds:
+#       reference_prim: "/World/OakTableSmall"
+#       center_area_scale: [0.8, 0.8]
+#       fallback_table_bounds_m:
+#         x: [-0.4, 0.4]
+#         y: [-0.3, 0.3]
+#     min_distance_m: 0.18
+#     items:
+#       - path: "/World/nut"
+#         radius_m: 0.05
+#         yaw_deg: [-180.0, 180.0]
+#         z_offset_m: 0.0
+#         scale: [3.0, 3.0, 4.0]
+#       - path: "/World/bolt"
+#         radius_m: 0.05
+#         yaw_deg: [-180.0, 180.0]
+#         z_offset_m: 0.0
+#         scale: 3.0
+#       - path: "/World/Bin_B04_20x35x14cm_PR_V_NVD_01"
+#         radius_m: 0.15
+#         yaw_deg: [-20.0, 20.0]
+#         z_offset_m: 0.0
+#   lighting:
+#     lights:
+#       - path: "/World/Environment/DistantLight"
+#         intensity: [1000.0, 5000.0]
+#         exposure_jitter: [-0.5, 0.5]
+#         color_temperature: [4500.0, 7000.0]

@@ -34,7 +34,7 @@ You should see the AR passthrough view and controller tracking status.
 In a new terminal:
 
 ```bash
-source /opt/ros/humble/setup.bash
+source /opt/ros/jazzy/setup.bash  # or humble depending on your distro
 ros2 topic list | grep quest
 
 # Should show:

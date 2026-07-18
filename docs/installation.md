@@ -17,7 +17,7 @@ Complete guide to set up the Quest 3 VR Teleoperation project.
 
 | Software | Version | Purpose |
 |----------|---------|---------|
-| ROS 2 Humble | Latest | Robot communication |
+| ROS 2 Jazzy or Humble | Latest | Robot communication |
 | Python | 3.10+ | Bridge and teleop scripts |
 | NVIDIA Isaac Sim | 5.0.0+ | Robot simulation |
 | Meta Quest Browser | Latest | WebXR client |

@@ -9,7 +9,6 @@ from src.isaac_backend import (
     CameraImagePublishers,
     CameraManager,
     DomainRandomizer,
-    FFWBG2DomainRandomizer,
     IsaacApp,
     JointStatePublisher,
 )
@@ -22,7 +21,7 @@ from src.recording import (
     RecordingFrameSnapshot,
     build_recording_schema,
 )
-from src.robot_adapters import OpenArmAdapter
+from src.robot_adapters import RobotAdapter
 from src.teleop_core import BimanualTeleopSession, TeleopSessionConfig
 
 
@@ -59,7 +58,7 @@ class RecordingLoopState:
 
 def run_bimanual_runtime(
     *,
-    adapter: OpenArmAdapter,
+    adapter: RobotAdapter,
     runtime_config: TeleopSessionConfig,
     isaac_config: dict,
     camera_config: dict,
@@ -116,14 +115,9 @@ def run_bimanual_runtime(
             return 1
         print(f"[Init] Found robot at: {adapter.robot_prim_path}")
 
-        randomizer_cls = (
-            FFWBG2DomainRandomizer
-            if adapter.config.get("robot_type") == "ffw_bg2"
-            else DomainRandomizer
-        )
-        domain_randomizer = randomizer_cls(world.stage, adapter.config.get("domain_randomization"))
+        domain_randomizer = DomainRandomizer(world.stage, adapter.config.get("domain_randomization"))
         domain_randomizer.initialize()
-        print(f"[Init] Domain randomizer: {randomizer_cls.__name__} (enabled={domain_randomizer.enabled})")
+        print(f"[Init] Domain randomizer: DomainRandomizer (enabled={domain_randomizer.enabled})")
 
         print("[Init] Loading IK Solvers...")
         ik_enabled = _initialize_ik(adapter)
@@ -263,7 +257,7 @@ def _with_optimized_recording_settings(isaac_config: dict) -> dict:
     return config
 
 
-def _initialize_ik(adapter: OpenArmAdapter) -> bool:
+def _initialize_ik(adapter: RobotAdapter) -> bool:
     try:
         ik_enabled = adapter.initialize_ik()
         if ik_enabled:
@@ -282,7 +276,7 @@ def _initialize_ik(adapter: OpenArmAdapter) -> bool:
     return False
 
 
-def _print_joint_info(adapter: OpenArmAdapter, dof_names: list[str]) -> None:
+def _print_joint_info(adapter: RobotAdapter, dof_names: list[str]) -> None:
     print(f"[Info] Available DOFs: {dof_names}")
     print(f"[Info] Left arm indices: {adapter.left_arm_indices}")
     print(f"[Info] Right arm indices: {adapter.right_arm_indices}")
@@ -291,7 +285,7 @@ def _print_joint_info(adapter: OpenArmAdapter, dof_names: list[str]) -> None:
 
 
 def _print_ready(
-    adapter: OpenArmAdapter,
+    adapter: RobotAdapter,
     runtime_config: TeleopSessionConfig,
     camera_manager: CameraManager,
     recording_config: RecordingConfig,
@@ -326,7 +320,7 @@ def _print_ready(
         print("[Recording] Disabled")
 
 
-def _adapter_display_name(adapter: OpenArmAdapter) -> str:
+def _adapter_display_name(adapter: RobotAdapter) -> str:
     return str(
         adapter.config.get("display_name")
         or adapter.config.get("robot_type")
@@ -337,7 +331,7 @@ def _adapter_display_name(adapter: OpenArmAdapter) -> str:
 def _run_control_loop(
     *,
     isaac_app: IsaacApp,
-    adapter: OpenArmAdapter,
+    adapter: RobotAdapter,
     teleop_session: BimanualTeleopSession,
     controller_provider,
     joint_state_publisher: JointStatePublisher,
@@ -574,7 +568,7 @@ def _run_control_loop(
         print(f"[ERROR] Control loop crashed: {exc}")
 
 
-def _advance_render_counter(adapter: OpenArmAdapter, render_every_n_steps: int) -> bool:
+def _advance_render_counter(adapter: RobotAdapter, render_every_n_steps: int) -> bool:
     """Advance the per-iteration render counter and report whether this
     iteration should render.
 
@@ -602,7 +596,7 @@ def _handle_button_events(
     *,
     button_events,
     isaac_app: IsaacApp,
-    adapter: OpenArmAdapter,
+    adapter: RobotAdapter,
     teleop_session: BimanualTeleopSession,
     camera_manager: CameraManager,
     domain_randomizer: DomainRandomizer | None,
@@ -744,7 +738,7 @@ def _maybe_print_recording_frame_progress(
 
 def _maybe_record_frame(
     *,
-    adapter: OpenArmAdapter,
+    adapter: RobotAdapter,
     recorder: LeRobotEpisodeRecorder,
     recording_settings: RecordingConfig,
     recording_schema,
@@ -780,7 +774,7 @@ def _maybe_record_frame(
 
 def _reset_scene(
     isaac_app: IsaacApp,
-    adapter: OpenArmAdapter,
+    adapter: RobotAdapter,
     teleop_session: BimanualTeleopSession,
     domain_randomizer: DomainRandomizer | None = None,
     *,
@@ -905,7 +899,7 @@ def _handle_not_ready(
 
 
 def _maybe_print_ik_debug(
-    adapter: OpenArmAdapter,
+    adapter: RobotAdapter,
     teleop_session: BimanualTeleopSession,
     session_update,
     debug_ik: bool,
@@ -1010,7 +1004,7 @@ def _fmt_mapping(values) -> str:
 
 
 def _print_session_statistics(
-    adapter: OpenArmAdapter,
+    adapter: RobotAdapter,
     camera_manager: CameraManager,
     recorder: LeRobotEpisodeRecorder | None,
 ) -> None:

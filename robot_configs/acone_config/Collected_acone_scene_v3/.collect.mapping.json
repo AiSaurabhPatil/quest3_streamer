@@ -1,0 +1,911 @@
+{
+    "version": "1.0",
+    "file_records": [
+        {
+            "source_url": "https://omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/2023_1/Automotive/Carpaint/Carpaint_Metallic_01.mdl",
+            "source_hash": "8401687c4fd9c18bd85665ae04deae57a3e995bb",
+            "target_url": "./omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/2023_1/Automotive/Carpaint/Carpaint_Metallic_01.mdl",
+            "target_hash": "30cbb806fae49e125145141754eab6b4a71c52b2"
+        },
+        {
+            "source_url": "https://omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/2023_1/Automotive/Carpaint/Carpaint_Metallic_02.mdl",
+            "source_hash": "b9dc531faeae173128cc45b54ad1ec1e42e8196a",
+            "target_url": "./omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/2023_1/Automotive/Carpaint/Carpaint_Metallic_02.mdl",
+            "target_hash": "c474c7a9610f69e0f67ed2398380a8c89245f4dd"
+        },
+        {
+            "source_url": "https://omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/2023_1/Automotive/Carpaint/Carpaint_Metallic_05.mdl",
+            "source_hash": "e1e8e32d18896d91fd298afe066b71064ac06f0e",
+            "target_url": "./omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/2023_1/Automotive/Carpaint/Carpaint_Metallic_05.mdl",
+            "target_hash": "8159e6feabbe6dc6ade0ed437142c75de854584a"
+        },
+        {
+            "source_url": "https://omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/2023_1/Automotive/Metal/Metal_Black_Paint.mdl",
+            "source_hash": "7b4b5839e50d76f87068190fd7ea419021328d13",
+            "target_url": "./omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/2023_1/Automotive/Metal/Metal_Black_Paint.mdl",
+            "target_hash": "a13e63f21641bec83afe1665440736ae4bbc19bc"
+        },
+        {
+            "source_url": "https://omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/2023_1/Automotive/Metal/Metal_Dark_Dirty.mdl",
+            "source_hash": "0f894f21780721435cdb441fec00e2d8af5cf8ef",
+            "target_url": "./omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/2023_1/Automotive/Metal/Metal_Dark_Dirty.mdl",
+            "target_hash": "d94b064c7b04391f06ec295cbf761ea20369a6db"
+        },
+        {
+            "source_url": "https://omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/2023_1/Automotive/Rims/Rim_Black_Painted_Metal.mdl",
+            "source_hash": "a016d11b21961d60d020e04188c9b2707e89c5ef",
+            "target_url": "./omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/2023_1/Automotive/Rims/Rim_Black_Painted_Metal.mdl",
+            "target_hash": "3aea838b754f705328a6859065df4669dc5957d0"
+        },
+        {
+            "source_url": "https://omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/2023_1/Base/Metals/Metal_Door.mdl",
+            "source_hash": "ae73daac333035921d1f60b57855b84924f5e944",
+            "target_url": "./omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/2023_1/Base/Metals/Metal_Door.mdl",
+            "target_hash": "39dd9458b57fddd7053a0e56df59b7115a06cadd"
+        },
+        {
+            "source_url": "https://omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/2023_1/vMaterials_2/Metal/Metal_Cast.mdl",
+            "source_hash": "2b943460ecb4f18fc3074a23b2fc5b26b9490ee6",
+            "target_url": "./omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/2023_1/vMaterials_2/Metal/Metal_Cast.mdl",
+            "target_hash": "ab2ccb57f5fa2c1879a5758af0b3ef8a4f65926a"
+        },
+        {
+            "source_url": "https://omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/2023_1/vMaterials_2/Paint/Carpaint/Carpaint_Metallic.mdl",
+            "source_hash": "1edfac861b8fe653b00670cb81e0b2fb3c086889",
+            "target_url": "./omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/2023_1/vMaterials_2/Paint/Carpaint/Carpaint_Metallic.mdl",
+            "target_hash": "e2c264634dbd70f14b99868986bfdeeb0f14a383"
+        },
+        {
+            "source_url": "https://omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/2023_1/vMaterials_2/Paint/Carpaint/Carpaint_Solid.mdl",
+            "source_hash": "e28300278c6afda50e97cc85c732b117210266b4",
+            "target_url": "./omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/2023_1/vMaterials_2/Paint/Carpaint/Carpaint_Solid.mdl",
+            "target_hash": "6e106a50cd518c6b700b8f8c0cb6160f59646f82"
+        },
+        {
+            "source_url": "https://omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/2023_1/vMaterials_2/Paint/Paint_Gun_Metal.mdl",
+            "source_hash": "70a76db7fb1578090354d5a01bed73df219856fc",
+            "target_url": "./omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/2023_1/vMaterials_2/Paint/Paint_Gun_Metal.mdl",
+            "target_hash": "e69026d5e0cdcdc6e08893959140e15bc0a41041"
+        },
+        {
+            "source_url": "https://omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/2023_1/vMaterials_2/Plastic/Polycarbonate_Opaque.mdl",
+            "source_hash": "bb46f35a5d67ce2134db5b45a32eec0feb44e240",
+            "target_url": "./omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/2023_1/vMaterials_2/Plastic/Polycarbonate_Opaque.mdl",
+            "target_hash": "3edce13c0619a128d91b90e45039fbd74aaf7def"
+        },
+        {
+            "source_url": "https://omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/2023_1/vMaterials_2/Stone/Devil_Black.mdl",
+            "source_hash": "2d7b96f5fe052910263e7f9ca68da220a2d54470",
+            "target_url": "./omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/2023_1/vMaterials_2/Stone/Devil_Black.mdl",
+            "target_hash": "1c753ed078b9a70de2b46fba8dfe2430ecb52f35"
+        },
+        {
+            "source_url": "/home/saurabh/Developement/ARX_Model/AC one/URDF/\u65e0\u624b\u67c4AC one/ACone/urdf/ACone/payloads/Physics/mujoco.usda",
+            "source_hash": "381f4486430d21b9793aee5f960c336db8e5f2de",
+            "target_url": "./home/saurabh/Developement/ARX_Model/AC one/URDF/\u65e0\u624b\u67c4AC one/ACone/urdf/ACone/payloads/Physics/mujoco.usda",
+            "target_hash": "ece5439d8d7bca446365960875daf451e1c5b327"
+        },
+        {
+            "source_url": "https://omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/2023_1/Base/Metals/Metal_Door/Metal_Door_Normal.png",
+            "source_hash": "a100b0d8ed0656d1df335420663f0716c91d9cc2",
+            "target_url": "./omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/2023_1/Base/Metals/Metal_Door/Metal_Door_Normal.png",
+            "target_hash": "2ae3f8c4f707f7a7e62a08956902ca2d7ff730c5"
+        },
+        {
+            "source_url": "https://omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/2023_1/Automotive/Surfacing/ov_misc_textures_noise/noise_scratch2.png",
+            "source_hash": "8a961523784ae2bf156ce2ff389a6e3116772d59",
+            "target_url": "./omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/2023_1/Automotive/Surfacing/ov_misc_textures_noise/noise_scratch2.png",
+            "target_hash": "04228acc6cd2f0b175551ee41e8698a8df00dbf6"
+        },
+        {
+            "source_url": "https://omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/2023_1/Automotive/Surfacing/ov_metal_a_01/ov_metal_a_01_basecolor.png",
+            "source_hash": "5fe40c9321cf1d980cc81aa2533f30d919219492",
+            "target_url": "./omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/2023_1/Automotive/Surfacing/ov_metal_a_01/ov_metal_a_01_basecolor.png",
+            "target_hash": "a9b6eec51ea1617f3e44d82d5aebb750fe1a232a"
+        },
+        {
+            "source_url": "https://omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/2023_1/Automotive/Templates/OmniUber_Automotive.mdl",
+            "source_hash": "f25bfdd451655b86141cc0aee41cc93dd502e970",
+            "target_url": "./omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/2023_1/Automotive/Templates/OmniUber_Automotive.mdl",
+            "target_hash": "39abea24edb6830faf43123d4ed7b4883d5f48f2"
+        },
+        {
+            "source_url": "https://omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/2023_1/Automotive/Surfacing/ov_plastic_grain_b_01/ov_plastic_grain_b_01_basecolor.png",
+            "source_hash": "9dcc6b7154e28f820f0efd2e8415d0cfdc9451c8",
+            "target_url": "./omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/2023_1/Automotive/Surfacing/ov_plastic_grain_b_01/ov_plastic_grain_b_01_basecolor.png",
+            "target_hash": "6c496eb8b12e7a9dec8b08344830f87cf8a1382e"
+        },
+        {
+            "source_url": "https://omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/2023_1/Automotive/Surfacing/ov_metal_a_01/ov_metal_a_01_orm.png",
+            "source_hash": "de2edb4aa5220844a5b7c9fa783fa2793eb7e897",
+            "target_url": "./omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/2023_1/Automotive/Surfacing/ov_metal_a_01/ov_metal_a_01_orm.png",
+            "target_hash": "508e77f31fff24bc94644baefcd7ad3dc72b7ce7"
+        },
+        {
+            "source_url": "https://omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/2023_1/Automotive/Surfacing/ov_metal_a_01/ov_metal_a_01_normal.png",
+            "source_hash": "767da5a8363eecc46d7b352c19a0d73795d57c05",
+            "target_url": "./omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/2023_1/Automotive/Surfacing/ov_metal_a_01/ov_metal_a_01_normal.png",
+            "target_hash": "3246a1eb4c271a908c47c603ce842b60cf2b2d80"
+        },
+        {
+            "source_url": "https://omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/2023_1/Automotive/Surfacing/ov_plastic_grain_b_01/ov_plastic_grain_b_01_orm.png",
+            "source_hash": "cbaf5073a2095ad6f97dcfdd1b83ee3009d956b2",
+            "target_url": "./omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/2023_1/Automotive/Surfacing/ov_plastic_grain_b_01/ov_plastic_grain_b_01_orm.png",
+            "target_hash": "68fc897b838edec5f2b13c9f2cc851c5b2b5eca0"
+        },
+        {
+            "source_url": "https://omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/2023_1/Automotive/Surfacing/ov_plastic_grain_b_01/ov_plastic_grain_b_01_normal.png",
+            "source_hash": "f7038d044a2a50ea29ba98a80ee4f6122706e5f6",
+            "target_url": "./omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/2023_1/Automotive/Surfacing/ov_plastic_grain_b_01/ov_plastic_grain_b_01_normal.png",
+            "target_hash": "42fd2f7a13267d99baab497d47ffe62420d5d6e3"
+        },
+        {
+            "source_url": "https://omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/2023_1/Automotive/Surfacing/ov_misc_textures_noise/perlin1.png",
+            "source_hash": "ad91dc21238e0c7ae20627aa179031031016110b",
+            "target_url": "./omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/2023_1/Automotive/Surfacing/ov_misc_textures_noise/perlin1.png",
+            "target_hash": "13efd94e2c13615aaeb5933911847145c5607d80"
+        },
+        {
+            "source_url": "https://omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/2023_1/Automotive/Surfacing/ov_plastic_grain_c_01/ov_plastic_grain_c_01_roughness.png",
+            "source_hash": "838b10de3cfb8a045e9ec80d16b8c962cc46c838",
+            "target_url": "./omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/2023_1/Automotive/Surfacing/ov_plastic_grain_c_01/ov_plastic_grain_c_01_roughness.png",
+            "target_hash": "91af9381bca17f76c831e321ddb54e651525bb86"
+        },
+        {
+            "source_url": "https://omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/2023_1/vMaterials_2/Paint/Carpaint/textures/smudges_scratches_A_rough.jpg",
+            "source_hash": "61ce01ca5a5be8ec5ed5e089baff99c93fec2960",
+            "target_url": "./omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/2023_1/vMaterials_2/Paint/Carpaint/textures/smudges_scratches_A_rough.jpg",
+            "target_hash": "d0bace1a160af6743524ed0c6ba932756305a1e2"
+        },
+        {
+            "source_url": "https://omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/2023_1/vMaterials_2/Metal/textures/cast_metal_multi_R_rough_G_smudges.jpg",
+            "source_hash": "c0b5753e7a32348343bc255a90ab0fdc1c8a3c41",
+            "target_url": "./omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/2023_1/vMaterials_2/Metal/textures/cast_metal_multi_R_rough_G_smudges.jpg",
+            "target_hash": "395a8196c7830a14fd5c7482aeb5d4cf150a95cc"
+        },
+        {
+            "source_url": "https://omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/2023_1/vMaterials_2/Stone/textures/devil_black_multi.jpg",
+            "source_hash": "73ed5d5efd879fcb0d2e400baeeb7ea98dace936",
+            "target_url": "./omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/2023_1/vMaterials_2/Stone/textures/devil_black_multi.jpg",
+            "target_hash": "dd4c4be5284b389baf171a26806905c71705e504"
+        },
+        {
+            "source_url": "https://omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/2023_1/vMaterials_2/Metal/textures/cast_metal_norm.jpg",
+            "source_hash": "3501903cb38116bb4843ab71673a8b61aa1ce3af",
+            "target_url": "./omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/2023_1/vMaterials_2/Metal/textures/cast_metal_norm.jpg",
+            "target_hash": "a74dbc7270acfe09d1ae4f00631a553c262a6d58"
+        },
+        {
+            "source_url": "https://omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/2023_1/vMaterials_2/Stone/textures/devil_black_diff.jpg",
+            "source_hash": "259225d8a92f7cfdca88568912862d96705ebe8e",
+            "target_url": "./omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/2023_1/vMaterials_2/Stone/textures/devil_black_diff.jpg",
+            "target_hash": "b29698352153efaeb1bf7989e96e2b3deedfc091"
+        },
+        {
+            "source_url": "https://omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/2023_1/vMaterials_2/Stone/textures/devil_black_norm.jpg",
+            "source_hash": "000f5212b30e8ecd51d18c02b2dd3daba562d0dc",
+            "target_url": "./omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/2023_1/vMaterials_2/Stone/textures/devil_black_norm.jpg",
+            "target_hash": "c5ac95607115d948a64ae3914bc081ee5241f152"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/home_03/textures/810-hdri-skies-com.hdr",
+            "source_hash": "ce877aecbc2c6ed447e0ef2c82c3e22b85729b11",
+            "target_url": "./GenieSimAssets/background/common/home_03/textures/810-hdri-skies-com.hdr",
+            "target_hash": "f159d082c78bab5ad456deee4baf626c06af6c2b"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/objects/iros/pen_cup/iros_pen_cup_000/Aligned.usd",
+            "source_hash": "f44678f60ca1dd5259c8cf81bceb5383bc209667",
+            "target_url": "./GenieSimAssets/objects/iros/pen_cup/iros_pen_cup_000/Aligned.usd",
+            "target_hash": "9957b335ed72b424f022e4bd4f379136999c38e3"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/home_03/textures/scene_home_02_part_00_Alb.png",
+            "source_hash": "b472dc1ad2b1b05e510b5187729c0f1a2b359cdd",
+            "target_url": "./GenieSimAssets/background/common/home_03/textures/scene_home_02_part_00_Alb.png",
+            "target_hash": "7b76f119ae6e811c95ad946f4558dc431faca928"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/home_03/textures/scene_home_02_part_00_Met.jpg",
+            "source_hash": "d92f0cb1216f237ba2a3f03fe1325fec55a8bd06",
+            "target_url": "./GenieSimAssets/background/common/home_03/textures/scene_home_02_part_00_Met.jpg",
+            "target_hash": "6585080c05c6b8a78ecc6cd7f3c58b16df4f8413"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/home_03/textures/scene_home_02_part_00_Nor.jpg",
+            "source_hash": "b2733b272aacb4cf0921c1ef614890234c5a0c90",
+            "target_url": "./GenieSimAssets/background/common/home_03/textures/scene_home_02_part_00_Nor.jpg",
+            "target_hash": "9b77e31f8bccf9dce14d4ee239d52a4b1f8affd2"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/home_03/textures/scene_home_02_part_01_Alb.jpg",
+            "source_hash": "6b8ec38bf126dfe548a94e536f8aab308c00ea4b",
+            "target_url": "./GenieSimAssets/background/common/home_03/textures/scene_home_02_part_01_Alb.jpg",
+            "target_hash": "787f5c8f0efd1289ec83621f0782fd70af3c96e0"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/home_03/textures/scene_home_02_part_01_Met.jpg",
+            "source_hash": "539edf35521fe10b819ff34b9820feac5a12525d",
+            "target_url": "./GenieSimAssets/background/common/home_03/textures/scene_home_02_part_01_Met.jpg",
+            "target_hash": "17c4d971e37674b80fe9b0059c38ce61c1d85286"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/home_03/textures/scene_home_02_part_01_Nor.jpg",
+            "source_hash": "38cb6f07856f1dd71a8e672cd34728dfc13393ef",
+            "target_url": "./GenieSimAssets/background/common/home_03/textures/scene_home_02_part_01_Nor.jpg",
+            "target_hash": "c9392ba1606b624354b98b6615597e871386c10a"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/home_03/textures/scene_home_02_part_01_Rgh.jpg",
+            "source_hash": "a91def8ed2a31e67497caa8733e6c0c38606170b",
+            "target_url": "./GenieSimAssets/background/common/home_03/textures/scene_home_02_part_01_Rgh.jpg",
+            "target_hash": "0f8396ed0928ddbaeafe1143873be3ee4f70a34e"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/home_03/textures/scene_home_02_part_02_Alb.png",
+            "source_hash": "41cb04caa50ace5f9e8a829be846d13e5d816c0b",
+            "target_url": "./GenieSimAssets/background/common/home_03/textures/scene_home_02_part_02_Alb.png",
+            "target_hash": "c82f1f10c8a1a6447022fe1d964f013d34b0ed13"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/home_03/textures/scene_home_02_part_02_Met.png",
+            "source_hash": "2eb1afb48202b148a52cc6abba678e10b0b90a92",
+            "target_url": "./GenieSimAssets/background/common/home_03/textures/scene_home_02_part_02_Met.png",
+            "target_hash": "4eb358fdc5c6667bf9f1d8c1cafcaee237fae4f0"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/home_03/textures/scene_home_02_part_02_Nor.png",
+            "source_hash": "3ab5745d069ef1666ba225e605f5d75820aecfb1",
+            "target_url": "./GenieSimAssets/background/common/home_03/textures/scene_home_02_part_02_Nor.png",
+            "target_hash": "47373c7060cf4c0d39a0dfca2521759bebf74d63"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/home_03/textures/scene_home_02_part_02_Rgh.png",
+            "source_hash": "7a4a47016d9a4481aeefea2b350f39d1801fcd6b",
+            "target_url": "./GenieSimAssets/background/common/home_03/textures/scene_home_02_part_02_Rgh.png",
+            "target_hash": "edfe0198eb20733e79071e18a9916ebd9736d370"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/home_03/textures/scene_home_02_part_03_Alb.jpg",
+            "source_hash": "dc8318f66e17a880f9aca994f8eaa86513357ebb",
+            "target_url": "./GenieSimAssets/background/common/home_03/textures/scene_home_02_part_03_Alb.jpg",
+            "target_hash": "cda758556edf01accf799bdab804ada90e2a7001"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/home_03/textures/scene_home_02_part_03_Met.jpg",
+            "source_hash": "c2a2fd4ca7171a36b45ea2a06cf49f8b43ea9742",
+            "target_url": "./GenieSimAssets/background/common/home_03/textures/scene_home_02_part_03_Met.jpg",
+            "target_hash": "a83d6e324496a06e7b1656d4e1d4acb1b9a7ff9f"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/home_03/textures/scene_home_02_part_03_Nor.jpg",
+            "source_hash": "ae5a5de23b8bbe62f8fef6dbe511992364559899",
+            "target_url": "./GenieSimAssets/background/common/home_03/textures/scene_home_02_part_03_Nor.jpg",
+            "target_hash": "ae81781bcde013826599fd5fd13d44ab8b54f4fa"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/home_03/textures/scene_home_02_part_03_Rgh.jpg",
+            "source_hash": "68827213d3cf9e5e0ae34029bf815a807b760664",
+            "target_url": "./GenieSimAssets/background/common/home_03/textures/scene_home_02_part_03_Rgh.jpg",
+            "target_hash": "7637b6cc3f8727e979986625b0298175091cb8b8"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/home_03/textures/scene_home_02_part_04_Alb.jpg",
+            "source_hash": "9c93379ac920508533a285fd22c027fbb8b82815",
+            "target_url": "./GenieSimAssets/background/common/home_03/textures/scene_home_02_part_04_Alb.jpg",
+            "target_hash": "dbe7fb4801a2b2caa978f51095966077608e9a15"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/home_03/textures/scene_home_02_part_04_Met.jpg",
+            "source_hash": "f67489fe0fd0b6f976d4cfbfc19be5b67b984d9c",
+            "target_url": "./GenieSimAssets/background/common/home_03/textures/scene_home_02_part_04_Met.jpg",
+            "target_hash": "4a13947a20a6da5420a47fea43f381bfa414663e"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/home_03/textures/scene_home_02_part_04_Nor.jpg",
+            "source_hash": "5838733162005a496d22534b4808b39e3760971d",
+            "target_url": "./GenieSimAssets/background/common/home_03/textures/scene_home_02_part_04_Nor.jpg",
+            "target_hash": "8aacce65b0fb0d34e5dfee17b86a8643e85b1376"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/home_03/textures/scene_home_03_body_Alb.jpg",
+            "source_hash": "7df421517b4b5d7dbca6a859b8879c94d46c1018",
+            "target_url": "./GenieSimAssets/background/common/home_03/textures/scene_home_03_body_Alb.jpg",
+            "target_hash": "0093cb6ad03f70118856f1752a421421e630bbf6"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/home_03/textures/scene_home_03_body_Met.jpg",
+            "source_hash": "80e8a5d40a6f1dd34e13e11ea19e9b1ba6570de1",
+            "target_url": "./GenieSimAssets/background/common/home_03/textures/scene_home_03_body_Met.jpg",
+            "target_hash": "962b463b7cc857ba2da553ce792e511f215c2485"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/home_03/textures/scene_home_03_body_Nor.jpg",
+            "source_hash": "c3298f2b3d0e415f3269cdea9e686723e354506e",
+            "target_url": "./GenieSimAssets/background/common/home_03/textures/scene_home_03_body_Nor.jpg",
+            "target_hash": "78966814b7dc9b992bb597d261b31640383f7a0d"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/home_03/textures/scene_home_03_body_Rgh.jpg",
+            "source_hash": "a1845656f501c033cec217aa16d59fdd5c130c5f",
+            "target_url": "./GenieSimAssets/background/common/home_03/textures/scene_home_03_body_Rgh.jpg",
+            "target_hash": "2a105d4f14c84ad4a8370ef940d6dd793f7b1134"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/objects/sft/pen/sft_pen_000/Aligned.usd",
+            "source_hash": "4edb7400763391e6441d36e72d56a7ffadb6c2c2",
+            "target_url": "./GenieSimAssets/objects/sft/pen/sft_pen_000/Aligned.usd",
+            "target_hash": "a1e4884b21e3a20c612239d214a20726e4035006"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/desk_decoration/benchmark_desk_decoration_001/textures/benchmark_desk_decoration_002_Alb.jpg",
+            "source_hash": "b3455cdf8ba5d209af76bc4574b8d9bf5690086b",
+            "target_url": "./GenieSimAssets/background/common/desk_decoration/benchmark_desk_decoration_001/textures/benchmark_desk_decoration_002_Alb.jpg",
+            "target_hash": "675626b96f7567a6279be7c278b9eb2b4a040394"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/desk_decoration/benchmark_desk_decoration_001/textures/benchmark_desk_decoration_002_Met.jpg",
+            "source_hash": "bc6f29cef97e57bc8a0e4f56c7b8e9a7af11012b",
+            "target_url": "./GenieSimAssets/background/common/desk_decoration/benchmark_desk_decoration_001/textures/benchmark_desk_decoration_002_Met.jpg",
+            "target_hash": "8b5670c3f245c6c7986a1bc89029a665487ed573"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/desk_decoration/benchmark_desk_decoration_001/textures/benchmark_desk_decoration_002_Nor.jpg",
+            "source_hash": "9649e53a02c6d72e12f27a6f9c503cfb43e98fc3",
+            "target_url": "./GenieSimAssets/background/common/desk_decoration/benchmark_desk_decoration_001/textures/benchmark_desk_decoration_002_Nor.jpg",
+            "target_hash": "32919c0d68c7ee397f5c9eb4edce9c2639f7efeb"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/desk_decoration/benchmark_desk_decoration_001/textures/benchmark_desk_decoration_002_Rgh.jpg",
+            "source_hash": "4c849e817b3295851570fe610e161cbc6872f0fe",
+            "target_url": "./GenieSimAssets/background/common/desk_decoration/benchmark_desk_decoration_001/textures/benchmark_desk_decoration_002_Rgh.jpg",
+            "target_hash": "7d831338874b8075446838505c8e12c05beacafc"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/objects/benchmark/book/benchmark_book_01/textures/book_01_01_Alb.jpg",
+            "source_hash": "83d3dcb13c9fff57dd54d7ddd3c04dbd6f8aa2b3",
+            "target_url": "./GenieSimAssets/objects/benchmark/book/benchmark_book_01/textures/book_01_01_Alb.jpg",
+            "target_hash": "5cc7ce00a66322c77555acc57fb48ba8a8af0e1f"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/objects/benchmark/book/benchmark_book_01/textures/book_01_02_Alb.jpg",
+            "source_hash": "64bb9286149f9f355010fc7a1bd6ebd853cda9a2",
+            "target_url": "./GenieSimAssets/objects/benchmark/book/benchmark_book_01/textures/book_01_02_Alb.jpg",
+            "target_hash": "149c959ed236a90bbdb07e4b953aab4c4ce14660"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/objects/benchmark/book/benchmark_book_01/textures/book_01_03_Alb.jpg",
+            "source_hash": "46fda281b18a9d8394af220f5560e68e23a073fe",
+            "target_url": "./GenieSimAssets/objects/benchmark/book/benchmark_book_01/textures/book_01_03_Alb.jpg",
+            "target_hash": "ef89047959557fbab7fc33f5a5a682ddf8b098e8"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/objects/benchmark/book/benchmark_book_01/textures/book_01_04_Alb.jpg",
+            "source_hash": "fc9d6f4f9b168cae8089320ca6a6c80a6af31973",
+            "target_url": "./GenieSimAssets/objects/benchmark/book/benchmark_book_01/textures/book_01_04_Alb.jpg",
+            "target_hash": "d45366eab9b09a9ee1705b67e6449766432fb56b"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/objects/benchmark/book/benchmark_book_01/textures/book_01_05_Alb.jpg",
+            "source_hash": "9d0cb26847c62a536f6684a40ea803d13a86af06",
+            "target_url": "./GenieSimAssets/objects/benchmark/book/benchmark_book_01/textures/book_01_05_Alb.jpg",
+            "target_hash": "4ba8083642505c76811f8b703a5c159609d4976e"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/objects/benchmark/book/benchmark_book_01/textures/book_Met.jpg",
+            "source_hash": "1f56f95f61465a5b83038c77470dc16249dd713f",
+            "target_url": "./GenieSimAssets/objects/benchmark/book/benchmark_book_01/textures/book_Met.jpg",
+            "target_hash": "83078241f38dced5f1f1e6b65b0a09e740cddcc4"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/objects/benchmark/book/benchmark_book_01/textures/book_Nor.jpg",
+            "source_hash": "0ad944177e061ad688f892f97612ebecf53adff6",
+            "target_url": "./GenieSimAssets/objects/benchmark/book/benchmark_book_01/textures/book_Nor.jpg",
+            "target_hash": "ead46dc939961bf9f93c579ee1fff620544d795a"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/objects/benchmark/book/benchmark_book_01/textures/book_Rgh.jpg",
+            "source_hash": "436cfcd5f97a6a8953ecedc76878824efd3d289e",
+            "target_url": "./GenieSimAssets/objects/benchmark/book/benchmark_book_01/textures/book_Rgh.jpg",
+            "target_hash": "c7ed260cc5cf93e83d378cf7d1c38bba6af913c2"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/table/benchmark_table_017/textures/benchmark_table_016_00_Alb.jpg",
+            "source_hash": "5f1984cb5a68b697488a5d7a40bb28d13cbfa377",
+            "target_url": "./GenieSimAssets/background/common/table/benchmark_table_017/textures/benchmark_table_016_00_Alb.jpg",
+            "target_hash": "e33778d6ed2ce50acf768352d25a6085127adf6c"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/table/benchmark_table_017/textures/benchmark_table_016_00_Met.jpg",
+            "source_hash": "04c47762538a4840d6b01076e5df8a84dc9d8ce4",
+            "target_url": "./GenieSimAssets/background/common/table/benchmark_table_017/textures/benchmark_table_016_00_Met.jpg",
+            "target_hash": "7d852227fcaa458f86aee9449f920900e1423d4e"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/table/benchmark_table_017/textures/benchmark_table_016_00_Nor.JPG",
+            "source_hash": "ee72418089b506a0886ae10c8ab67bdfc70b1d63",
+            "target_url": "./GenieSimAssets/background/common/table/benchmark_table_017/textures/benchmark_table_016_00_Nor.JPG",
+            "target_hash": "fafb6d968587da9d154de2cd50d6cb848800ccf9"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/table/benchmark_table_017/textures/benchmark_table_016_00_Rgh.jpg",
+            "source_hash": "3ae23f84d1c7d3777e82be51f2cee6b893a35347",
+            "target_url": "./GenieSimAssets/background/common/table/benchmark_table_017/textures/benchmark_table_016_00_Rgh.jpg",
+            "target_hash": "76e38b73221334075ade187d0f0711dd9cbd6132"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/table/benchmark_table_017/textures/benchmark_table_016_01_Alb.jpg",
+            "source_hash": "39a03a984f79f3e73919b9bd9c50240b87108570",
+            "target_url": "./GenieSimAssets/background/common/table/benchmark_table_017/textures/benchmark_table_016_01_Alb.jpg",
+            "target_hash": "a5ba015a3a2861a96617c7de503de1f513499bd6"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/table/benchmark_table_017/textures/benchmark_table_016_01_Met.jpg",
+            "source_hash": "bcf4e9d7d5f893c9ebe607bcc49d0aa00e07dce4",
+            "target_url": "./GenieSimAssets/background/common/table/benchmark_table_017/textures/benchmark_table_016_01_Met.jpg",
+            "target_hash": "6ea89a82f338dcc6e7639b255dea0bcfa922243d"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/table/benchmark_table_017/textures/benchmark_table_016_01_Rgh.jpg",
+            "source_hash": "7e1e4040408d87090f8eb0e2cb7c6f725379427a",
+            "target_url": "./GenieSimAssets/background/common/table/benchmark_table_017/textures/benchmark_table_016_01_Rgh.jpg",
+            "target_hash": "6ad6900396e1b656a0f79fc154f8471396729847"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/table/benchmark_table_017/textures/benchmark_table_016_02_Alb.jpg",
+            "source_hash": "045c69b12b63ca74e8be14539ccd339485bb723d",
+            "target_url": "./GenieSimAssets/background/common/table/benchmark_table_017/textures/benchmark_table_016_02_Alb.jpg",
+            "target_hash": "38e825fca2a7857e95bd2cea73c83c81f6421158"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/table/benchmark_table_017/textures/benchmark_table_016_02_Met.jpg",
+            "source_hash": "5f1f49698f92d2f1205803a3843ac675f6737b03",
+            "target_url": "./GenieSimAssets/background/common/table/benchmark_table_017/textures/benchmark_table_016_02_Met.jpg",
+            "target_hash": "85906fe6fbc06cdaa07f92ca430b0ee4fa0f25b5"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/table/benchmark_table_017/textures/benchmark_table_016_02_Nor.jpg",
+            "source_hash": "13bfbd2573d9b42dcf2107f1fd00b7c9e0ccbcb0",
+            "target_url": "./GenieSimAssets/background/common/table/benchmark_table_017/textures/benchmark_table_016_02_Nor.jpg",
+            "target_hash": "f88ee4e8bbe91dba744216ac507968575ed5d7f5"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/table/benchmark_table_017/textures/benchmark_table_016_02_Rgh.jpg",
+            "source_hash": "23edb27d24dfcbda5b3315328cfa9dc22fcbb69a",
+            "target_url": "./GenieSimAssets/background/common/table/benchmark_table_017/textures/benchmark_table_016_02_Rgh.jpg",
+            "target_hash": "625ffee00ceda6be2dc58781fe0cf352ded5af02"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/table/benchmark_table_017/textures/benchmark_table_016_03_Alb.jpg",
+            "source_hash": "f3cc2860ba5bee79fd75006d2efc0a9cd45e2d42",
+            "target_url": "./GenieSimAssets/background/common/table/benchmark_table_017/textures/benchmark_table_016_03_Alb.jpg",
+            "target_hash": "094463f4398226396a173ed30f0201b2750e0f91"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/table/benchmark_table_017/textures/benchmark_table_016_03_Met.jpg",
+            "source_hash": "8027393dd0a89f44f8c00026b0ebbaae006fcd24",
+            "target_url": "./GenieSimAssets/background/common/table/benchmark_table_017/textures/benchmark_table_016_03_Met.jpg",
+            "target_hash": "24c6c927342d69698dfa3fd39fbe050c428a6f3a"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/table/benchmark_table_017/textures/benchmark_table_016_03_Nor.jpg",
+            "source_hash": "44c30f88b42bb462d0de1c1a7b3cd12abb8ea3f0",
+            "target_url": "./GenieSimAssets/background/common/table/benchmark_table_017/textures/benchmark_table_016_03_Nor.jpg",
+            "target_hash": "a54a26e831c08f6469fd4173826de1ba9295b962"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/table/benchmark_table_017/textures/benchmark_table_016_03_Rgh.jpg",
+            "source_hash": "7d274e3c30b21e0dbd107c0e2c8c2c37c6cc04ae",
+            "target_url": "./GenieSimAssets/background/common/table/benchmark_table_017/textures/benchmark_table_016_03_Rgh.jpg",
+            "target_hash": "6a6fc1b0131c53d58851fbb6b096cd32669df1aa"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/table/benchmark_table_017/textures/benchmark_table_016_04_Alb.jpg",
+            "source_hash": "dce30006d7f3ba7224e7dd6153e0f9a5a18daaf2",
+            "target_url": "./GenieSimAssets/background/common/table/benchmark_table_017/textures/benchmark_table_016_04_Alb.jpg",
+            "target_hash": "3e55d8b67e657364a81afaa828e91e0b389071d6"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/table/benchmark_table_017/textures/benchmark_table_016_04_Met.jpg",
+            "source_hash": "9cbf522821fba4f39485520661b01ec5c009f473",
+            "target_url": "./GenieSimAssets/background/common/table/benchmark_table_017/textures/benchmark_table_016_04_Met.jpg",
+            "target_hash": "701375d84e1fc7ef80abb7e6f5eb4433ad9a09e8"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/table/benchmark_table_017/textures/benchmark_table_016_04_Nor.jpg",
+            "source_hash": "8fbcf6d6be7923370416eee754c921a467263f5e",
+            "target_url": "./GenieSimAssets/background/common/table/benchmark_table_017/textures/benchmark_table_016_04_Nor.jpg",
+            "target_hash": "173806429edf9c89a74bf64bf4d844e42819414d"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/table/benchmark_table_017/textures/benchmark_table_016_04_Rgh.jpg",
+            "source_hash": "7679629a5a13db56f975a95d7987d71e434d23ff",
+            "target_url": "./GenieSimAssets/background/common/table/benchmark_table_017/textures/benchmark_table_016_04_Rgh.jpg",
+            "target_hash": "57e29c392547148596198ed2f4346986ad811f5e"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/table/benchmark_table_017/textures/benchmark_table_016_05_Alb.jpg",
+            "source_hash": "0bfdcffb0120e4bb91a03947c2e7c7650afc9d7f",
+            "target_url": "./GenieSimAssets/background/common/table/benchmark_table_017/textures/benchmark_table_016_05_Alb.jpg",
+            "target_hash": "f35ae28da5d3e08ccce6788779e54f627c30e110"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/table/benchmark_table_017/textures/benchmark_table_016_05_Met.jpg",
+            "source_hash": "6e1cfe8d6754d836082ae367f8b03a904173e3f5",
+            "target_url": "./GenieSimAssets/background/common/table/benchmark_table_017/textures/benchmark_table_016_05_Met.jpg",
+            "target_hash": "c7188a7c3f783d6269741e0b51d8e793721d3693"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/table/benchmark_table_017/textures/benchmark_table_016_05_Nor.jpg",
+            "source_hash": "f288733bf9614b93a8dd5e76bba26eaab8d4b413",
+            "target_url": "./GenieSimAssets/background/common/table/benchmark_table_017/textures/benchmark_table_016_05_Nor.jpg",
+            "target_hash": "1dd96492fc4329cd1b37953d00702710078d11c3"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/table/benchmark_table_017/textures/benchmark_table_016_05_Rgh.jpg",
+            "source_hash": "1c0355f8001d67c705646a0eba4618ffcb22a875",
+            "target_url": "./GenieSimAssets/background/common/table/benchmark_table_017/textures/benchmark_table_016_05_Rgh.jpg",
+            "target_hash": "2cd197ec228918215041536b46c0902db66ac5e0"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/desk_decoration/benchmark_desk_decoration_007/textures/benchmark_desk_decoration_007_Alb.jpg",
+            "source_hash": "80db25d60d5a5164c93d45369b84f859e755ba06",
+            "target_url": "./GenieSimAssets/background/common/desk_decoration/benchmark_desk_decoration_007/textures/benchmark_desk_decoration_007_Alb.jpg",
+            "target_hash": "c361064b421ea4a8ba3c9ea7ab9da6fcfd77123d"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/desk_decoration/benchmark_desk_decoration_007/textures/benchmark_desk_decoration_007_Met.jpg",
+            "source_hash": "f9405fb69c39b9b92839ad42ff7506a2a437a1c9",
+            "target_url": "./GenieSimAssets/background/common/desk_decoration/benchmark_desk_decoration_007/textures/benchmark_desk_decoration_007_Met.jpg",
+            "target_hash": "790d0bb458569306a6da1fa53e955823484f5c4b"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/desk_decoration/benchmark_desk_decoration_007/textures/benchmark_desk_decoration_007_Nor.jpg",
+            "source_hash": "8a130e0f406e7030b8c2b5c597475582da25d8df",
+            "target_url": "./GenieSimAssets/background/common/desk_decoration/benchmark_desk_decoration_007/textures/benchmark_desk_decoration_007_Nor.jpg",
+            "target_hash": "6a9ee3140a3262fd00db415eff1cb438fabbb434"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/desk_decoration/benchmark_desk_decoration_007/textures/benchmark_desk_decoration_007_Rgh.jpg",
+            "source_hash": "ae64f492c9837b23ae7556fa5aeae756da964a54",
+            "target_url": "./GenieSimAssets/background/common/desk_decoration/benchmark_desk_decoration_007/textures/benchmark_desk_decoration_007_Rgh.jpg",
+            "target_hash": "3deb05d464a28fbbe55aaf514d4bd307d7678951"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/desk_decoration/benchmark_desk_decoration_010/textures/benchmark_desk_decoration_010_Alb.jpg",
+            "source_hash": "d86c02265aecfe4d23ecc2735bce2d1395cd13c5",
+            "target_url": "./GenieSimAssets/background/common/desk_decoration/benchmark_desk_decoration_010/textures/benchmark_desk_decoration_010_Alb.jpg",
+            "target_hash": "a6d1952aeb65dd9104c4ce54384b0157cb61bc9c"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/desk_decoration/benchmark_desk_decoration_010/textures/benchmark_desk_decoration_010_Met.jpg",
+            "source_hash": "ebbdaa11728a37e36079bb3b34628a50e52a9732",
+            "target_url": "./GenieSimAssets/background/common/desk_decoration/benchmark_desk_decoration_010/textures/benchmark_desk_decoration_010_Met.jpg",
+            "target_hash": "760fce5c8f05f8596248571b93ebf56fc9fc6c25"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/desk_decoration/benchmark_desk_decoration_010/textures/benchmark_desk_decoration_010_Nor.jpg",
+            "source_hash": "a9045a4f2fdfede495712f50a0b60110f0bf5cc7",
+            "target_url": "./GenieSimAssets/background/common/desk_decoration/benchmark_desk_decoration_010/textures/benchmark_desk_decoration_010_Nor.jpg",
+            "target_hash": "b090822f259b1d3febc9d1b51d843f2653b62348"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/desk_decoration/benchmark_desk_decoration_010/textures/benchmark_desk_decoration_010_Rgh.jpg",
+            "source_hash": "fa7a2b24f80ad82a637d4609e7751dd31cbeb5b9",
+            "target_url": "./GenieSimAssets/background/common/desk_decoration/benchmark_desk_decoration_010/textures/benchmark_desk_decoration_010_Rgh.jpg",
+            "target_hash": "4e2bec1ef8930be04bf47ea7965fd6073ba32f12"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/objects/benchmark/mouse/benchmark_mouse_000/textures/mouse_Alb.jpg",
+            "source_hash": "7a8f77cc9f6f06750909ee8fb53ef255ba2224a2",
+            "target_url": "./GenieSimAssets/objects/benchmark/mouse/benchmark_mouse_000/textures/mouse_Alb.jpg",
+            "target_hash": "aa1142c8f638bfa26cbf8445ecc0a8f6e5a47adf"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/objects/benchmark/book/benchmark_book_03/textures/book_06_01_Alb.jpg",
+            "source_hash": "3319211c027268863b6559bc7fbd3ebddae3534b",
+            "target_url": "./GenieSimAssets/objects/benchmark/book/benchmark_book_03/textures/book_06_01_Alb.jpg",
+            "target_hash": "17c98869684d9ca3cf388465d5d4cf891e63c7ab"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/objects/benchmark/book/benchmark_book_03/textures/book_06_02_Alb.jpg",
+            "source_hash": "6c395c2e6961fec28572882cb780aed34eaa7cd3",
+            "target_url": "./GenieSimAssets/objects/benchmark/book/benchmark_book_03/textures/book_06_02_Alb.jpg",
+            "target_hash": "a979b37bac90845243e6d50b0a7203f01fac7d16"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/objects/benchmark/book/benchmark_book_03/textures/book_06_03_Alb.jpg",
+            "source_hash": "1190096ad2a42afae7b4810f05e873234ffbb44a",
+            "target_url": "./GenieSimAssets/objects/benchmark/book/benchmark_book_03/textures/book_06_03_Alb.jpg",
+            "target_hash": "c501007fa1cce1f0ea401e12a407f10bef3d9fcf"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/objects/benchmark/book/benchmark_book_03/textures/book_06_04_Alb.jpg",
+            "source_hash": "d97c14d02dc5dcb04fb725a79e7099d5a72c62ea",
+            "target_url": "./GenieSimAssets/objects/benchmark/book/benchmark_book_03/textures/book_06_04_Alb.jpg",
+            "target_hash": "0a3e7800e450fb20f59471899bf20a0fc5f675a8"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/objects/benchmark/book/benchmark_book_03/textures/book_06_05_Alb.jpg",
+            "source_hash": "fb0c88eb78e9aedc5ee84a4543011f072ca1c073",
+            "target_url": "./GenieSimAssets/objects/benchmark/book/benchmark_book_03/textures/book_06_05_Alb.jpg",
+            "target_hash": "789639ae85e579d95bd444503fd63bb078b40d90"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/objects/benchmark/book/benchmark_book_03/textures/book_Met.jpg",
+            "source_hash": "5f00c5941dbeffe39431c8e50db6ae82ae38d5b8",
+            "target_url": "./GenieSimAssets/objects/benchmark/book/benchmark_book_03/textures/book_Met.jpg",
+            "target_hash": "8340b3bca5a24e8684bea9791a1916c15f3ee6da"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/objects/benchmark/book/benchmark_book_03/textures/book_Nor.jpg",
+            "source_hash": "69e5e8f97beeef49f481ec10a0f064ebfe3efe57",
+            "target_url": "./GenieSimAssets/objects/benchmark/book/benchmark_book_03/textures/book_Nor.jpg",
+            "target_hash": "2dcd9e7dcbd2892cb5798466cef0785bcb39a7fa"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/objects/benchmark/book/benchmark_book_03/textures/book_Rgh.jpg",
+            "source_hash": "7bef9ea86a73dc786620fc9b0c47ad1c0b670d71",
+            "target_url": "./GenieSimAssets/objects/benchmark/book/benchmark_book_03/textures/book_Rgh.jpg",
+            "target_hash": "acc7204bc1ef823e4e92a620418dd7fd9d0c2990"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/desk_decoration/benchmark_desk_decoration_005/textures/benchmark_desk_decoration_005_Alb.jpg",
+            "source_hash": "9f9a8fa1db357b77b88583873cfb26845ae501ed",
+            "target_url": "./GenieSimAssets/background/common/desk_decoration/benchmark_desk_decoration_005/textures/benchmark_desk_decoration_005_Alb.jpg",
+            "target_hash": "1d5100d9d666d4b650fbc7c06dc5dffd4f884aee"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/desk_decoration/benchmark_desk_decoration_005/textures/benchmark_desk_decoration_005_Met.jpg",
+            "source_hash": "546ec8bdf6404ce9b0918935735662c05390d7c6",
+            "target_url": "./GenieSimAssets/background/common/desk_decoration/benchmark_desk_decoration_005/textures/benchmark_desk_decoration_005_Met.jpg",
+            "target_hash": "d0cc3f4098e893d2bb38ed44c488975cf6e9274a"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/desk_decoration/benchmark_desk_decoration_005/textures/benchmark_desk_decoration_005_Nor.jpg",
+            "source_hash": "288572794fee0d8e52811c57580fb4de4c737527",
+            "target_url": "./GenieSimAssets/background/common/desk_decoration/benchmark_desk_decoration_005/textures/benchmark_desk_decoration_005_Nor.jpg",
+            "target_hash": "a0cc37b481365c17654e6ee5e52e788b32bf9489"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/desk_decoration/benchmark_desk_decoration_005/textures/benchmark_desk_decoration_005_Rgh.jpg",
+            "source_hash": "09c18f17c5d429de19fe25d8de596cb4e0701c8e",
+            "target_url": "./GenieSimAssets/background/common/desk_decoration/benchmark_desk_decoration_005/textures/benchmark_desk_decoration_005_Rgh.jpg",
+            "target_hash": "a6e085f10f18a5d87bfec92e2d13cf09ef98fa3d"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/desk_decoration/benchmark_desk_decoration_012/textures/benchmark_desk_decoration_005_Alb.jpg",
+            "source_hash": "bc0aab3d3f005649d692ddbe5f2658d6cc427b48",
+            "target_url": "./GenieSimAssets/background/common/desk_decoration/benchmark_desk_decoration_012/textures/benchmark_desk_decoration_005_Alb.jpg",
+            "target_hash": "a744edd5f657007969c228b230d3641f14dee549"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/desk_decoration/benchmark_desk_decoration_012/textures/benchmark_desk_decoration_005_Met.jpg",
+            "source_hash": "223832f260f856293a641a98c120cf4e8f533b46",
+            "target_url": "./GenieSimAssets/background/common/desk_decoration/benchmark_desk_decoration_012/textures/benchmark_desk_decoration_005_Met.jpg",
+            "target_hash": "19a58072d158dcf83e1e538943f422c976e63f38"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/desk_decoration/benchmark_desk_decoration_012/textures/benchmark_desk_decoration_005_Nor.jpg",
+            "source_hash": "0989f611443dd2f7b90fa13db1baf2e2d5ddb087",
+            "target_url": "./GenieSimAssets/background/common/desk_decoration/benchmark_desk_decoration_012/textures/benchmark_desk_decoration_005_Nor.jpg",
+            "target_hash": "25fdc647d1dc629024e29fb03e742b280bb3142f"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/desk_decoration/benchmark_desk_decoration_012/textures/benchmark_desk_decoration_005_Rgh.jpg",
+            "source_hash": "4fae4b76e584d0d606386c87d18535b2ad991ef9",
+            "target_url": "./GenieSimAssets/background/common/desk_decoration/benchmark_desk_decoration_012/textures/benchmark_desk_decoration_005_Rgh.jpg",
+            "target_hash": "721c0282e57b0c638fd0153c39b63cd731ba4b1f"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/objects/benchmark/book/benchmark_book_02/textures/book_02_01_Alb.jpg",
+            "source_hash": "2bbd2d4c99efbad9696d64b31109ac80b7d7b5ab",
+            "target_url": "./GenieSimAssets/objects/benchmark/book/benchmark_book_02/textures/book_02_01_Alb.jpg",
+            "target_hash": "7ec9b81b1a7c3acc4a612c2c06808cb49675e9d8"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/objects/benchmark/book/benchmark_book_02/textures/book_02_02_Alb.jpg",
+            "source_hash": "357e4fdf08fd70b8894b8958b949876753300edd",
+            "target_url": "./GenieSimAssets/objects/benchmark/book/benchmark_book_02/textures/book_02_02_Alb.jpg",
+            "target_hash": "bed4b7f80567230ef4b2e947309239c6b5c9d0d9"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/objects/benchmark/book/benchmark_book_02/textures/book_02_03_Alb.jpg",
+            "source_hash": "f95e4fb4ebb6da6300a4c97294fbdd1a1fff244b",
+            "target_url": "./GenieSimAssets/objects/benchmark/book/benchmark_book_02/textures/book_02_03_Alb.jpg",
+            "target_hash": "b85726e08385fffd1df100409ba6e0d0e6fe1865"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/objects/benchmark/book/benchmark_book_02/textures/book_02_04_Alb.jpg",
+            "source_hash": "45a6b40e65b1f18d3b1b1676f7cdb55a58ca9176",
+            "target_url": "./GenieSimAssets/objects/benchmark/book/benchmark_book_02/textures/book_02_04_Alb.jpg",
+            "target_hash": "d32e539dfaf6fed25d7ee786cc4cd07bdf1e7a38"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/objects/benchmark/book/benchmark_book_02/textures/book_02_05_Alb.jpg",
+            "source_hash": "5e73b2dfa74314d9009e64a3495148362770965a",
+            "target_url": "./GenieSimAssets/objects/benchmark/book/benchmark_book_02/textures/book_02_05_Alb.jpg",
+            "target_hash": "27e6f4d6e044a3c776373ba701deea5b315a5d47"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/objects/benchmark/book/benchmark_book_02/textures/book_Met.jpg",
+            "source_hash": "e1de8de824f9b68195d878cd04dda39b79a3e2be",
+            "target_url": "./GenieSimAssets/objects/benchmark/book/benchmark_book_02/textures/book_Met.jpg",
+            "target_hash": "c9af28f2822a78129df283bbfe0661bdb4911e62"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/objects/benchmark/book/benchmark_book_02/textures/book_Nor.jpg",
+            "source_hash": "7482a04d93b8a8a2afb2525c1a2aa0edc2519075",
+            "target_url": "./GenieSimAssets/objects/benchmark/book/benchmark_book_02/textures/book_Nor.jpg",
+            "target_hash": "ab786a6e3b4cb73de93ac46d4b6d036b185c7db9"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/objects/benchmark/book/benchmark_book_02/textures/book_Rgh.jpg",
+            "source_hash": "ec37dd983388c3e310fc38daab203364f1a660be",
+            "target_url": "./GenieSimAssets/objects/benchmark/book/benchmark_book_02/textures/book_Rgh.jpg",
+            "target_hash": "829c2bc58dd1cceef1425a54bea56836bf84841f"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/ceiling_light/benchmark_ceiling_light_004/textures/benchmark_ceiling_light_002_Alb.jpg",
+            "source_hash": "703e056c5e29fb8195843f73550468a1b2420a71",
+            "target_url": "./GenieSimAssets/background/common/ceiling_light/benchmark_ceiling_light_004/textures/benchmark_ceiling_light_002_Alb.jpg",
+            "target_hash": "9de73317aa13fa231f9639022f6f70cd2f744563"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/ceiling_light/benchmark_ceiling_light_004/textures/benchmark_ceiling_light_002_Emi.jpg",
+            "source_hash": "93febc4e1fc02be7e3c13572a880c6cd1bfa75e2",
+            "target_url": "./GenieSimAssets/background/common/ceiling_light/benchmark_ceiling_light_004/textures/benchmark_ceiling_light_002_Emi.jpg",
+            "target_hash": "1e45511136942c100c54cd934912be168111ef4e"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/background/common/ceiling_light/benchmark_ceiling_light_004/textures/benchmark_ceiling_light_002_Nor.jpg",
+            "source_hash": "b2b4e139d7028ebccc2d244bd1ba38ce01fb8ef7",
+            "target_url": "./GenieSimAssets/background/common/ceiling_light/benchmark_ceiling_light_004/textures/benchmark_ceiling_light_002_Nor.jpg",
+            "target_hash": "3f77c490d77a3cc8b5cc36951b1009cb3d246629"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/objects/benchmark/book/benchmark_book_04/textures/book_04_01_Alb.jpg",
+            "source_hash": "6c91d9a42104f2f7704bfdc050f77da84f321d41",
+            "target_url": "./GenieSimAssets/objects/benchmark/book/benchmark_book_04/textures/book_04_01_Alb.jpg",
+            "target_hash": "1067fc404b16ed92d01b77b3d7ae29610266e70d"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/objects/benchmark/book/benchmark_book_04/textures/book_04_02_Alb.jpg",
+            "source_hash": "9904a57ab581c14bf9f07786d5145f8dcb5dfb89",
+            "target_url": "./GenieSimAssets/objects/benchmark/book/benchmark_book_04/textures/book_04_02_Alb.jpg",
+            "target_hash": "1125a97059b10e75d96ac24aefe9f03ed2179246"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/objects/benchmark/book/benchmark_book_04/textures/book_04_03_Alb.jpg",
+            "source_hash": "9ce1cc884866189a3908ac260c3bdc6a8de1557e",
+            "target_url": "./GenieSimAssets/objects/benchmark/book/benchmark_book_04/textures/book_04_03_Alb.jpg",
+            "target_hash": "1e136be6ffc961dc1291e0074682d4b51e685c6b"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/objects/benchmark/book/benchmark_book_04/textures/book_04_04_Alb.jpg",
+            "source_hash": "b18c1df396512b1ce61472b54a88f5df09331e2c",
+            "target_url": "./GenieSimAssets/objects/benchmark/book/benchmark_book_04/textures/book_04_04_Alb.jpg",
+            "target_hash": "bbdc74867eb79ba992641493874660b3d14c9d9b"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/objects/benchmark/book/benchmark_book_04/textures/book_05_05_Alb.jpg",
+            "source_hash": "637f33dddc12332ce0812abcfc808d5d3a562ea6",
+            "target_url": "./GenieSimAssets/objects/benchmark/book/benchmark_book_04/textures/book_05_05_Alb.jpg",
+            "target_hash": "307560d64c99cd58d7406fee58eaf9fb547a59a2"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/objects/benchmark/book/benchmark_book_04/textures/book_Met.jpg",
+            "source_hash": "139d74334b6eb2d0917d1a91d44ff62c39a00810",
+            "target_url": "./GenieSimAssets/objects/benchmark/book/benchmark_book_04/textures/book_Met.jpg",
+            "target_hash": "32b7fd406d55660a24cc2febc2df27e57b57edf9"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/objects/benchmark/book/benchmark_book_04/textures/book_Nor.jpg",
+            "source_hash": "fe868f0943022ca85fac3774e1518becdc86d4ec",
+            "target_url": "./GenieSimAssets/objects/benchmark/book/benchmark_book_04/textures/book_Nor.jpg",
+            "target_hash": "8489f152ea36adc2b7c59468dac948f68d7fddba"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/objects/benchmark/book/benchmark_book_04/textures/book_Rgh.jpg",
+            "source_hash": "c87b510644d7ba1730eafd2fb510fcfe273ca0cb",
+            "target_url": "./GenieSimAssets/objects/benchmark/book/benchmark_book_04/textures/book_Rgh.jpg",
+            "target_hash": "508a13cae7299e9ba9b33203f05fd0c3571752aa"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/objects/benchmark/book/benchmark_book_00/textures/book_05_01_Alb.jpg",
+            "source_hash": "86e7b11ad10d17ff5a83a6435343f260d7ea3bbd",
+            "target_url": "./GenieSimAssets/objects/benchmark/book/benchmark_book_00/textures/book_05_01_Alb.jpg",
+            "target_hash": "47952f202e3aa2a251d9e2321f4ec959c37b4f1f"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/objects/benchmark/book/benchmark_book_00/textures/book_05_02_Alb.jpg",
+            "source_hash": "54f8e06e240d751e899d6a601bb3ed7808f64bc9",
+            "target_url": "./GenieSimAssets/objects/benchmark/book/benchmark_book_00/textures/book_05_02_Alb.jpg",
+            "target_hash": "8ffaba4916cea9e7050c8186bfc507f1f07f6735"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/objects/benchmark/book/benchmark_book_00/textures/book_05_03_Alb.jpg",
+            "source_hash": "1cf01e89663b2fb32d93d90cad7868bc7ce654f0",
+            "target_url": "./GenieSimAssets/objects/benchmark/book/benchmark_book_00/textures/book_05_03_Alb.jpg",
+            "target_hash": "d2bbd2fdffd028a5b3576d585834786b05555fa0"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/objects/benchmark/book/benchmark_book_00/textures/book_05_04_Alb.jpg",
+            "source_hash": "af7c769b4c357fe5381b795dc941f9b36d64d860",
+            "target_url": "./GenieSimAssets/objects/benchmark/book/benchmark_book_00/textures/book_05_04_Alb.jpg",
+            "target_hash": "f3df1c6b58e1e11e83dfcb09f9df1b6cc81dfe8e"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/objects/benchmark/book/benchmark_book_00/textures/book_05_05_Alb.jpg",
+            "source_hash": "f416569cbb745e15ac1671b7a87d461f15ac37ef",
+            "target_url": "./GenieSimAssets/objects/benchmark/book/benchmark_book_00/textures/book_05_05_Alb.jpg",
+            "target_hash": "6fb12ceefec15bbac8c8ff5a6a9e054396d59fac"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/objects/benchmark/book/benchmark_book_00/textures/book_Met.jpg",
+            "source_hash": "83b55e60a1473f6fde8fa7beb348418f66eeb73c",
+            "target_url": "./GenieSimAssets/objects/benchmark/book/benchmark_book_00/textures/book_Met.jpg",
+            "target_hash": "094499ea34f38a33c361453ff70392afdeced769"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/objects/benchmark/book/benchmark_book_00/textures/book_Nor.jpg",
+            "source_hash": "badd6d3e099ee7fd28bd7cc3e7bcc44dd88a9c05",
+            "target_url": "./GenieSimAssets/objects/benchmark/book/benchmark_book_00/textures/book_Nor.jpg",
+            "target_hash": "a5039853f44a078716811b4dd4d0567b1afc92a1"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/objects/benchmark/book/benchmark_book_00/textures/book_Rgh.jpg",
+            "source_hash": "4c821e31811b59d6ee644fd915c96a6f6e1961fa",
+            "target_url": "./GenieSimAssets/objects/benchmark/book/benchmark_book_00/textures/book_Rgh.jpg",
+            "target_hash": "a5f13c702fd7610d528ae98597de7e9f23774fc6"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/objects/iros/pen_cup/iros_pen_cup_000/textures/T_body_Alb.png",
+            "source_hash": "7b79a3f9ba5b4201da74bd851eb43fa20b3e7d2b",
+            "target_url": "./GenieSimAssets/objects/iros/pen_cup/iros_pen_cup_000/textures/T_body_Alb.png",
+            "target_hash": "fd5c73f61e97764d2e2c9be2b1c2e72908b1d3bf"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/objects/iros/pen_cup/iros_pen_cup_000/textures/T_body_Met.png",
+            "source_hash": "f5c59951dd025b91dca817fcac160ba6027497e8",
+            "target_url": "./GenieSimAssets/objects/iros/pen_cup/iros_pen_cup_000/textures/T_body_Met.png",
+            "target_hash": "0a0d58f8cb441cc97e0a194ceab4006ee248d2c2"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/objects/iros/pen_cup/iros_pen_cup_000/textures/T_body_Rgh.png",
+            "source_hash": "c125815b60d97584eea6a9d82945eff1373aa188",
+            "target_url": "./GenieSimAssets/objects/iros/pen_cup/iros_pen_cup_000/textures/T_body_Rgh.png",
+            "target_hash": "4a1734e8cbdf139451f3a7906cc372fdf1ad2653"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/objects/sft/pen/sft_pen_000/textures/Pen_Alb.jpg",
+            "source_hash": "652db842fd754b79ea3e176aa4d99fa85a2611e3",
+            "target_url": "./GenieSimAssets/objects/sft/pen/sft_pen_000/textures/Pen_Alb.jpg",
+            "target_hash": "76e8783fd9a5e8856dc0c860b56fee410192a593"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/objects/sft/pen/sft_pen_000/textures/Pen_Met.jpg",
+            "source_hash": "2e8f2f2d9ad7476173136104f201d6c12b98f853",
+            "target_url": "./GenieSimAssets/objects/sft/pen/sft_pen_000/textures/Pen_Met.jpg",
+            "target_hash": "782147ba937cd6e284f3b0355b4bbc5741a14de1"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/objects/sft/pen/sft_pen_000/textures/Pen_Nor.jpg",
+            "source_hash": "dd8d70f59c55312888f82166327d0025fa6fb06f",
+            "target_url": "./GenieSimAssets/objects/sft/pen/sft_pen_000/textures/Pen_Nor.jpg",
+            "target_hash": "4bf951d016d56287d3788e37d547a29c24f27d7e"
+        },
+        {
+            "source_url": "/mnt/external/saurabh_data/GenieSimAssets/objects/sft/pen/sft_pen_000/textures/Pen_Rgh.jpg",
+            "source_hash": "12efdc55e7dd03330c2076c9f67fe03066821006",
+            "target_url": "./GenieSimAssets/objects/sft/pen/sft_pen_000/textures/Pen_Rgh.jpg",
+            "target_hash": "1acf1222b92ef7380549724f099cd94ab3fb4792"
+        },
+        {
+            "source_url": "https://omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/2023_1/vMaterials_2/Plastic/textures/plastic_smudges.jpg",
+            "source_hash": "991ffc2547a55d19582f6479dcf3de3e7e103fb4",
+            "target_url": "./omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/2023_1/vMaterials_2/Plastic/textures/plastic_smudges.jpg",
+            "target_hash": "ded4f3a1a92bd07e0537bcb33cde95ad5111d3c7"
+        }
+    ]
+}

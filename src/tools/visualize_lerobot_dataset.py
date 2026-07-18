@@ -102,12 +102,53 @@ def _rate_to_float(value: str) -> float:
 
 
 def validate_dataset(root: Path, repo_id: str, episode_index: int) -> list[ValidationIssue]:
-    dataset_root = _dataset_root(root, repo_id)
     issues: list[ValidationIssue] = []
 
+    if not root.exists():
+        issues.append(ValidationIssue("error", f"Root path does not exist: {root}"))
+        parent = root.parent
+        if parent.exists() and parent.is_dir():
+            import difflib
+            matches = difflib.get_close_matches(root.name, [p.name for p in parent.iterdir() if p.is_dir()])
+            if matches:
+                suggestions = [str(parent / m) for m in matches]
+                issues.append(ValidationIssue("info", f"Did you mean one of these?\n  " + "\n  ".join(suggestions)))
+        return issues
+
+    dataset_root = _dataset_root(root, repo_id)
     info_path = dataset_root / "meta" / "info.json"
     if not info_path.exists():
-        issues.append(ValidationIssue("error", f"Missing required path: {info_path}"))
+        exact_path = root
+        repo_path = root / repo_id
+        if not repo_path.exists():
+            issues.append(ValidationIssue("error", f"Dataset directory not found at '{exact_path}' or '{repo_path}'"))
+            import difflib
+            parts = repo_id.strip("/").split("/")
+            current = root
+            suggested_parts = []
+            changed = False
+            for part in parts:
+                if current.exists() and current.is_dir():
+                    if (current / part).exists():
+                        suggested_parts.append(part)
+                        current = current / part
+                    else:
+                        subdirs = [p.name for p in current.iterdir() if p.is_dir()]
+                        matches = difflib.get_close_matches(part, subdirs)
+                        if matches:
+                            suggested_parts.append(matches[0])
+                            current = current / matches[0]
+                            changed = True
+                        else:
+                            suggested_parts.append(part)
+                            current = current / part
+                else:
+                    suggested_parts.append(part)
+            if changed:
+                suggested_repo = "/".join(suggested_parts)
+                issues.append(ValidationIssue("info", f"Did you mean repo-id: '{suggested_repo}'?"))
+        else:
+            issues.append(ValidationIssue("error", f"Could not find dataset metadata (meta/info.json) at '{exact_path}' or '{repo_path}'"))
         return issues
 
     info = _load_json(info_path)

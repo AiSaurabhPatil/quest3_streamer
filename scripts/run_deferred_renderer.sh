@@ -27,7 +27,7 @@ cd "$PROJECT_ROOT"
 # ---------------------------------------------------------------------------
 # Setup ROS2 environment for Isaac Sim 6.0
 # ---------------------------------------------------------------------------
-export ROS_DISTRO="${ROS_DISTRO:-humble}"
+export ROS_DISTRO="${ROS_DISTRO:-jazzy}"
 ISAAC_RCLPY_PATH="$ISAAC_SIM/exts/isaacsim.ros2.core/${ROS_DISTRO}/rclpy"
 ISAAC_ROS_LIB_PATH="$ISAAC_SIM/exts/isaacsim.ros2.core/${ROS_DISTRO}/lib"
 if [[ -d "$ISAAC_RCLPY_PATH" ]]; then

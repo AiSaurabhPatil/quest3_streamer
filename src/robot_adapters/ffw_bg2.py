@@ -2,14 +2,23 @@ from __future__ import annotations
 
 import numpy as np
 
-from .acone import AconeAdapter
+from .bimanual_lula import BimanualLulaAdapter
 
 
-class FFWBG2Adapter(AconeAdapter):
+class FFWBG2Adapter(BimanualLulaAdapter):
     """FFW BG2 uses arm_base_link-rooted Lula descriptors with world-space teleop targets."""
 
     def __init__(self, config: dict, project_root: str):
         super().__init__(config, project_root)
+        
+        # Inherit historical defaults from Acone (which FFW BG2 used to extend)
+        if "orientation_mode" not in self.ik_config:
+            self.orientation_mode = "position_only"
+            self._diagnostics.details["orientation_mode"] = self.orientation_mode
+        if "orientation_fallback_to_position" not in self.ik_config:
+            self.orientation_fallback_to_position = True
+            self._diagnostics.details["orientation_fallback_to_position"] = True
+
         self.target_position_offset = np.asarray(
             self.ik_config.get("target_position_offset", [0.0, 0.0, 0.0]),
             dtype=float,

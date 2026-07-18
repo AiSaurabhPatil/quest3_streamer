@@ -71,8 +71,8 @@ has_webrtc_arg() {
 
 EXTRA_ARGS=()
 if ! has_webrtc_arg "$@"; then
-    EXTRA_ARGS+=(--webrtc)
-    echo "[WebRTC] Isaac Sim streaming enabled by default. Connect with Isaac Sim WebRTC client to this host on port 49100."
+    EXTRA_ARGS+=(--no-webrtc)
+    echo "[GUI] Isaac Sim windowed GUI enabled by default."
 fi
 
 cd "$PROJECT_ROOT"
