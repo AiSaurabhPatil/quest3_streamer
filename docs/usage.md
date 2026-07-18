@@ -1,211 +1,382 @@
 # Usage Guide
 
-Complete guide to running VR teleoperation with Quest 3.
+Complete guide to running VR teleoperation, recording datasets, and rendering camera observations with TeleSim.
 
-## Quick Start: Wireless Streaming
+---
 
-The simplest way to get started:
+## Quick Start — LAN Teleop
+
+The simplest path when the Quest headset and workstation are on the **same WiFi network**:
 
 ```bash
-./scripts/run_wireless.sh
+./scripts/run_lan_teleop.sh --robot acone
 ```
 
-This single command:
+This single command starts three processes:
 
-1. Generates SSL certificates if missing
-2. Starts HTTPS server on port 8000
-3. Starts WebSocket ROS bridge on port 9999
-4. Prints the URL for your Quest browser
+1. **HTTPS server** (port 8000) — serves the WebXR page to the Quest browser
+2. **WebSocket bridge** (port 9999) — receives controller data and publishes ROS 2 topics
+3. **Robot teleop** — opens Isaac Sim with the windowed GUI on this workstation's monitor
 
-### Connect From Quest 3
-
-1. Put on your Quest 3 headset
-2. Open **Meta Quest Browser**
-3. Navigate to the URL shown in terminal: `https://<YOUR_PC_IP>:8000/web/webxr_streamer.html`
-4. **Accept the security warning** (click "Advanced" → "Proceed")
-5. Enter your PC's IP address in the form
-6. Click **"Start AR Session"**
-7. Allow any permission prompts
-
-You should see the AR passthrough view and controller tracking status.
-
-### Verify ROS Topics
-
-In a new terminal:
-
-```bash
-source /opt/ros/jazzy/setup.bash  # or humble depending on your distro
-ros2 topic list | grep quest
-
-# Should show:
-# /quest/left_hand/pose
-# /quest/right_hand/pose
-# /quest/left_hand/inputs
-# /quest/right_hand/inputs
+**On your Quest browser**, navigate to:
+```
+https://<WORKSTATION_LAN_IP>:8000/web/webxr_streamer.html
 ```
 
-Echo a topic to see live data:
+Accept the self-signed certificate warning (click **Advanced → Proceed**), then tap **"Start AR Session"**.
+
+> **Windowed GUI is the low-latency default.** Viewing the sim directly on the workstation monitor
+> has lower visual latency than encoding to WebRTC and decoding in a client. Control-loop speedup
+> comes from render throttling (`isaac.render_every_n_steps` in `config.yaml`), which renders only
+> every Nth physics step regardless of display mode.
+
+---
+
+## Calibration
+
+1. Isaac Sim loads and prints `[Init] Warming up Isaac Sim...`
+2. Start the AR session on the Quest
+3. **Hold both controllers steady** in a comfortable neutral pose for ~1 second (30 samples by default)
+4. The system prints `CALIBRATION COMPLETE` for each arm
+5. Your current hand position becomes the robot's workspace origin — move your hands to control the robot
+
+> **Calibration tip**: Sit or stand in the pose you intend to operate in. All movements are relative
+> to the calibrated origin, so a comfortable starting pose gives you the most workspace range.
+> To recalibrate, restart the script.
+
+---
+
+## Controller Buttons
+
+| Button | Action |
+|--------|--------|
+| **Left Secondary** (Y / X) | **Start** a new recording episode |
+| **Left Primary** (B / A) | **Save** the current episode |
+| **Right Secondary** | **Reset scene** (discards unsaved episode when deferred rendering is on) |
+| **Right Primary** | **Cycle camera views** (perspective → head → left wrist → right wrist) |
+| **Left / Right Trigger or Grip** | Close the respective gripper |
+| **Left / Right Controller Movement** | Move the respective arm's end-effector |
+
+---
+
+## Supported Robots
+
+All three robots are launched with the same `run_lan_teleop.sh` script using `--robot <name>`:
 
 ```bash
-ros2 topic echo /quest/right_hand/pose
+./scripts/run_lan_teleop.sh --robot openarm
+./scripts/run_lan_teleop.sh --robot acone
+./scripts/run_lan_teleop.sh --robot ffw_bg2
 ```
 
-### Remote Isaac Server Over VPN
-
-If Isaac Sim is running on a remote machine, keep the Quest talking to a nearby ingress and forward compact controller packets over the VPN:
+Or use the individual per-robot scripts directly:
 
 ```bash
-# Local machine near the Quest
-python src/webxr_ros_bridge.py \
+bash scripts/run_openarm_teleop.sh
+bash scripts/run_acone_teleop.sh
+bash scripts/run_ffw_bg2_teleop.sh
+```
+
+| Robot | Arms | DOF | Domain Randomization |
+|-------|------|-----|----------------------|
+| **OpenArm Bimanual** | L+R 7-DOF | 14 arm + 2 gripper (scalar) | Off by default |
+| **AC One** | L+R 6-DOF | 12 arm + 4 gripper | Off by default |
+| **FFW BG2** | L+R 7-DOF | 14 arm + 8 gripper | **On by default** |
+
+---
+
+## Recording Datasets
+
+Dataset recording is a **two-phase process** that decouples the live control loop from camera rendering.
+
+### Phase 1 — Teleop + State Recording
+
+Enable recording by passing `--record` (or setting `recording.enabled: true` in `config.yaml`):
+
+```bash
+./scripts/run_lan_teleop.sh \
+  --robot acone \
+  --record \
+  --dataset-repo-id local/quest3-acone \
+  --task "sort nuts and bolts in different bins" \
+  --recording-fps 30 \
+  --max-episodes 10
+```
+
+**What gets saved during teleop:**
+
+- Joint positions and actions for every frame (Parquet format, written by `worker_process.py`)
+- A per-episode sidecar JSON with domain randomization state (`meta/episodes/scene_ep_NNNNNN.json`)
+- **Camera images are NOT captured** — this keeps the GPU free for physics and IK
+
+The dataset is written to `datasets/local/quest3-acone/` by the `worker_process.py` subprocess
+running in `.venv`. Isaac Sim's Python is never polluted with LeRobot's dependencies.
+
+**Episode workflow during teleop:**
+
+1. Press **Left Secondary** (Y/X) to **start** a new episode
+2. Perform the task with both arms
+3. Press **Left Primary** (B/A) to **save** the episode
+4. Press **Right Secondary** to **reset** the scene before starting the next episode
+
+### Phase 2 — Deferred Camera Rendering
+
+After your teleop session, run the renderer to replay joint trajectories and capture camera frames:
+
+```bash
+./scripts/run_deferred_renderer.sh \
+  local/quest3-acone \
+  local/quest3-acone-rendered \
+  --robot-type acone
+```
+
+**What the renderer does:**
+
+1. Reads joint trajectories from the source dataset via `extract_states.py`
+2. Starts Isaac Sim in **headless mode** (no display needed — can run on a headless server)
+3. For each episode:
+   - Resets the world to USD default poses
+   - Restores the exact domain randomization state from the sidecar JSON
+   - Replays joints with correct physics substep timing to match the original control rate
+   - Captures RTX camera frames and writes them to the output dataset
+4. Writes the final LeRobot v3.0 dataset to `datasets/local/quest3-acone-rendered/`
+
+> **Physics substep auto-detection**: The renderer calculates how many physics steps to run per
+> frame based on `isaac.target_control_rate_hz` and `recording.fps` from your config.
+> Override with `--physics-substeps N` if needed.
+
+### Dataset Format
+
+| Property | Value |
+|----------|-------|
+| **Format** | LeRobot **v3.0** only (`dataset_format: v3.0` in config) |
+| **Location** | `datasets/<repo-id>/` |
+| **Camera features** | `observation.images.<camera_name>` (video encoded) |
+| **State / action** | `observation.state`, `action` (float32 vectors) |
+| **Scene sidecar** | `meta/episodes/scene_ep_NNNNNN.json` (domain randomization replay data) |
+
+---
+
+## Network Modes
+
+### Mode 1 — LAN Direct (Recommended)
+
+Quest and workstation on the **same WiFi network**. Isaac Sim renders on the local monitor.
+
+```bash
+./scripts/run_lan_teleop.sh --robot acone
+```
+
+### Mode 1b — LAN + WebRTC Viewport Streaming
+
+Stream the Isaac Sim viewport to a **different device** over the network using WebRTC:
+
+```bash
+./scripts/run_lan_teleop.sh --robot acone --webrtc
+```
+
+Connect with the [Isaac Sim Streaming Client](https://docs.isaacsim.omniverse.nvidia.com/latest/installation/install_streaming_client.html)
+on another device pointing at `<PC_IP>:49100`.
+
+### Mode 2 — VPN / Remote (Isaac Sim on a separate remote PC)
+
+Run a local ingress near the Quest, and forward controller packets over VPN to a remote machine
+running Isaac Sim.
+
+**Local PC — Terminal 1 (HTTPS server)**
+
+```bash
+source .venv/bin/activate
+python3 web/https_server.py 8000 --cert certs/cert.pem --key certs/key.pem
+```
+
+**Local PC — Terminal 2 (ingress bridge)**
+
+```bash
+source .venv/bin/activate
+python3 -m src.launch.webxr_bridge \
   --mode ingress \
   --host 0.0.0.0 \
   --port 9999 \
   --cert certs/cert.pem \
   --key certs/key.pem \
-  --forward-url ws://<REMOTE_SERVER_IP>:9998
-
-# Remote machine near Isaac Sim
-python src/webxr_ros_bridge.py --mode remote-receiver --host 0.0.0.0 --port 9998
+  --forward-url wss://<REMOTE_PC_IP>:9998 \
+  --forward-insecure
 ```
 
-The transport bridge logs packet rate, drop percentage, jitter, end-to-end packet age, and VPN hop age to help diagnose remote-control issues.
+**Remote PC — Terminal 1 (remote receiver)**
+
+```bash
+source .venv/bin/activate
+source /opt/ros/jazzy/setup.bash
+python3 -m src.launch.webxr_bridge \
+  --mode remote-receiver \
+  --host 0.0.0.0 \
+  --port 9998
+```
+
+**Remote PC — Terminal 2 (robot teleop)**
+
+```bash
+bash scripts/run_acone_teleop.sh
+```
+
+The transport bridge logs packet rate, drop percentage, jitter, and end-to-end packet age to
+help diagnose remote-control issues.
+
+### Mode 3 — Wireless Only (Bridge + HTTPS, no Isaac Sim)
+
+WebXR → ROS bridge without starting Isaac Sim. Useful for connecting to an external ROS stack:
+
+```bash
+./scripts/run_wireless.sh
+```
+
+### Mode 4 — Manual (3 separate terminals)
+
+For advanced debugging or custom setups:
+
+**Terminal 1 — HTTPS server**
+```bash
+source .venv/bin/activate
+python3 web/https_server.py 8000 --cert certs/cert.pem --key certs/key.pem
+```
+
+**Terminal 2 — WebSocket bridge (direct mode)**
+```bash
+source .venv/bin/activate
+# Use Isaac Sim's bundled rclpy (no separate ROS install needed)
+export PYTHONPATH="/path/to/isaac_sim/exts/isaacsim.ros2.core/jazzy/rclpy:$PYTHONPATH"
+export LD_LIBRARY_PATH="/path/to/isaac_sim/exts/isaacsim.ros2.core/jazzy/lib:$LD_LIBRARY_PATH"
+python3 -m src.launch.webxr_bridge \
+  --mode direct \
+  --host 0.0.0.0 \
+  --port 9999 \
+  --cert certs/cert.pem \
+  --key certs/key.pem
+```
+
+**Terminal 3 — Robot teleop**
+```bash
+bash scripts/run_acone_teleop.sh
+```
 
 ---
 
-## OpenArm Bimanual Teleoperation
+## Latency Tuning
 
-Control a dual-arm OpenArm robot in Isaac Sim.
+The system logs transport and control metrics every ~3 seconds:
 
-### Launch
-
-```bash
-./scripts/run_openarm_teleop.sh
+```
+[Transport][direct] rx=89.8Hz drop=0.2% jitter=4.1ms age_p50=31ms age_p95=74ms
+[Control] loop=110.0Hz left_success=99.0% left_ik_ms=3.2 left_browser_age_ms=45 left_age_ms=12
 ```
 
-### Calibration Process
+**Metrics explained:**
 
-1. **Wait for Isaac Sim to load** - The script will print initialization progress
-2. **Start AR session on Quest** - As described above
-3. **Hold both controllers steady** in a comfortable position
-4. **Wait ~1 second** - The system collects 30 samples for calibration
-5. **Look for "CALIBRATION COMPLETE"** message in terminal
-6. **Start moving!** - Your hands now control the robot arms
+| Metric | Description | Target |
+|--------|-------------|--------|
+| `loop Hz` | Control loop rate | ≥ `target_control_rate_hz` |
+| `age_p50` | Quest→bridge median latency | < 50 ms on LAN |
+| `age_p95` | Quest→bridge 95th-percentile latency | < 100 ms |
+| `left_browser_age_ms` | End-to-end Quest→applied latency | < 50 ms |
+| `drop%` | Packet drop rate | < 1% |
+| `left_ik_ms` | IK solve time per frame | < 5 ms |
 
-!!! tip "Calibration Tips"
-    - Stand or sit in a relaxed, natural pose
-    - Your calibration position becomes the robot's "home" position
-    - All movements are relative to this starting point
-    - You can recalibrate by restarting the script
+**Key tuning knobs in `config/config.yaml`:**
 
-### Controls
+| Config Key | Effect |
+|-----------|--------|
+| `isaac.target_control_rate_hz` | Target control loop rate (higher = more responsive) |
+| `isaac.render_every_n_steps` | Render only every Nth step (higher = faster loop, less smooth viewport) |
+| `transport.enable_prediction` | Enable pose prediction to cancel one-way transport lag |
+| `transport.prediction_horizon_ms` | Set to your measured `age_p50` value |
+| `teleop.smoothing.position_tau_s` | Smoothing time constant (~0.10 s = stable, lower = snappier) |
+| `teleop.stale_recovery_alpha` | Blend speed after a controller data hiccup |
 
-| Input | Action |
-|-------|--------|
-| Left Controller Movement | Moves left arm end-effector |
-| Right Controller Movement | Moves right arm end-effector |
-| Left Trigger OR Grip | Closes left gripper |
-| Right Trigger OR Grip | Closes right gripper |
-| A Button (Right) | Cycle camera view |
-| X Button (Left) | Cycle camera view |
-
-### Camera Views
-
-The A/X buttons cycle through available cameras:
-
-1. **Perspective** - Default third-person view
-2. **Head Camera** - Robot's head-mounted camera
-3. **Left Wrist Camera** - Left arm's wrist camera
-4. **Right Wrist Camera** - Right arm's wrist camera
-
-### Data Recording (LeRobot)
-
-The OpenArm teleop script can record episodes directly into a LeRobot dataset:
+**Analyze a captured log:**
 
 ```bash
-./scripts/run_openarm_teleop.sh \
-  --record \
-  --dataset-root datasets \
-  --dataset-repo-id local/quest3-openarm \
-  --task "Teleoperate OpenArm to complete the task" \
-  --recording-fps 30 \
-  --max-episodes 10
+python scripts/summarize_metrics.py /path/to/logfile.txt
 ```
 
-Recording uses a separate LeRobot writer process so Isaac Sim's Python environment
-does not need LeRobot installed. By default the writer runs with `.venv/bin/python`;
-override it with `LEROBOT_RECORDING_PYTHON` if you keep LeRobot elsewhere. Use a
-dedicated worker environment when you need a specific LeRobotDataset format:
+---
+
+## Domain Randomization
+
+Domain randomization randomizes object positions and scene lighting at the start of each episode.
+The exact randomization is saved in a sidecar JSON and replayed faithfully during deferred rendering
+so camera images match what the operator saw.
+
+**FFW BG2** has domain randomization enabled by default in `config/robots/ffw_bg2.yaml`.
+OpenArm and AC One have it commented out — uncomment to enable.
+
+Enable it in `config/robots/<robot>.yaml`:
+
+```yaml
+domain_randomization:
+  enabled: true
+  seed: null        # null = random seed per episode
+  settle_steps: 30  # physics steps to wait for objects to settle
+
+  objects:
+    bounds:
+      reference_prim: "/World/TablePrim"   # USD prim used as placement surface
+      center_area_scale: [0.8, 0.8]
+    min_distance_m: 0.18
+    items:
+      - path: "/World/Bowl"
+        radius_m: 0.11
+        yaw_deg: [-30.0, 30.0]
+        z_offset_m: 0.0
+      - path: "/World/Apple"
+        radius_m: 0.05
+        yaw_deg: [-180.0, 180.0]
+        z_offset_m: 0.0
+
+  lighting:
+    lights:
+      - path: "/World/Environment/DistantLight"
+        intensity: [1000.0, 5000.0]
+        exposure_jitter: [-0.5, 0.5]
+        color_temperature: [4500.0, 7000.0]
+```
+
+---
+
+## Visualizing Datasets
+
+Use the bundled [Rerun](https://rerun.io/)-based visualizer to inspect joint trajectories and
+camera frames side-by-side:
 
 ```bash
-uv venv .venv-lerobot-v21 --python 3.10
-uv pip install --python .venv-lerobot-v21/bin/python "lerobot==0.3.2"
-LEROBOT_RECORDING_PYTHON=$PWD/.venv-lerobot-v21/bin/python ./scripts/run_openarm_teleop.sh --record
+./scripts/visualize_lerobot_dataset.sh \
+  --repo-id local/quest3-acone \
+  --root datasets/local/quest3-acone \
+  --episode-index 0
 ```
 
-Set `recording.dataset_format` to `v3.0`, `v2.1`, or `auto`. `auto` uses the
-format written by the selected LeRobot worker.
+---
 
-Recorded camera videos default to 224x224 for pi0.5 training. The Isaac camera
-capture resolution defaults to the same size so the written videos match the
-LeRobot feature schema.
+## ROS 2 Topics Reference
 
-The OpenArm teleop script also publishes data for external recording:
+### Controller Topics (published by WebSocket bridge from Quest)
 
 | Topic | Type | Description |
 |-------|------|-------------|
-| `/joint_states` | `JointState` | All robot joint positions |
-| `/camera/head/image_raw` | `Image` | Head camera feed |
-| `/camera/wrist_left/image_raw` | `Image` | Left wrist camera |
-| `/camera/wrist_right/image_raw` | `Image` | Right wrist camera |
-
-Camera images are published asynchronously at ~15 Hz to avoid performance impact.
-The default camera image size is 224x224 RGB.
-
----
-
-## Franka Panda Teleoperation
-
-Control a single Franka Panda arm.
-
-### Launch
-
-```bash
-./scripts/run_panda_teleop.sh
-```
-
-### Controls
-
-| Input | Action |
-|-------|--------|
-| Right Controller Movement | Moves end-effector |
-| Trigger OR Grip | Closes gripper |
-| A Button | Switch camera view |
-
-### Calibration
-
-Same as OpenArm - hold your right hand steady for ~1 second after starting.
-
----
-
-## ROS Topics Reference
-
-### Controller Topics (from Quest)
-
-| Topic | Type | Description |
-|-------|------|-------------|
-| `/quest/left_hand/pose` | `geometry_msgs/PoseStamped` | Left controller 6DoF pose |
-| `/quest/right_hand/pose` | `geometry_msgs/PoseStamped` | Right controller 6DoF pose |
-| `/quest/left_hand/inputs` | `sensor_msgs/Joy` | Left controller buttons/axes |
-| `/quest/right_hand/inputs` | `sensor_msgs/Joy` | Right controller buttons/axes |
+| `/quest/left_hand/pose` | `geometry_msgs/PoseStamped` | Left controller 6-DoF pose |
+| `/quest/right_hand/pose` | `geometry_msgs/PoseStamped` | Right controller 6-DoF pose |
+| `/quest/left_hand/inputs` | `sensor_msgs/Joy` | Left controller buttons and axes |
+| `/quest/right_hand/inputs` | `sensor_msgs/Joy` | Right controller buttons and axes |
 
 ### Joy Message Mapping
 
 ```python
 # Axes (float values)
-axes[0] = trigger      # 0.0 to 1.0
-axes[1] = squeeze/grip # 0.0 to 1.0
-axes[2] = thumbstick_x # -1.0 to 1.0
-axes[3] = thumbstick_y # -1.0 to 1.0
+axes[0] = trigger       # 0.0 to 1.0
+axes[1] = squeeze/grip  # 0.0 to 1.0
+axes[2] = thumbstick_x  # -1.0 to 1.0
+axes[3] = thumbstick_y  # -1.0 to 1.0
 
 # Buttons (0 or 1)
 buttons[0] = A / X button
@@ -214,64 +385,29 @@ buttons[2] = Menu button
 buttons[3] = Thumbstick click
 ```
 
-### Robot Topics (from Isaac Sim)
+### Robot Topics (published by Isaac Sim)
 
 | Topic | Type | Description |
 |-------|------|-------------|
-| `/joint_states` | `sensor_msgs/JointState` | Robot joint positions |
-| `/camera/head/image_raw` | `sensor_msgs/Image` | Head camera (224x224 RGB by default) |
-| `/camera/wrist_left/image_raw` | `sensor_msgs/Image` | Left wrist camera |
-| `/camera/wrist_right/image_raw` | `sensor_msgs/Image` | Right wrist camera |
+| `/joint_states` | `sensor_msgs/JointState` | All robot joint positions |
+| `/camera/head_camera/image_raw` | `sensor_msgs/Image` | Head camera |
+| `/camera/left_wrist_camera/image_raw` | `sensor_msgs/Image` | Left wrist camera |
+| `/camera/right_wrist_camera/image_raw` | `sensor_msgs/Image` | Right wrist camera |
+| `/camera/perspective_camera/image_raw` | `sensor_msgs/Image` | Viewport perspective camera |
 
----
+Verify topics are publishing:
 
-## Advanced Configuration
-
-### Teleoperation Parameters
-
-Edit the `CONFIG` dictionary in `src/isaac_openarm_teleop.py`:
-
-```python
-CONFIG = {
-    "pos_scale": 1.0,          # VR to robot movement scale (1.0 = 1:1)
-    "smoothing": 0.9,          # Motion smoothing (0=none, 0.9=very smooth)
-    "gripper_threshold": 0.5,  # Trigger threshold to close gripper
-    "gripper_speed": 0.05,     # Gripper movement speed per frame
-    "calibration_samples": 30, # Samples for calibration (~1 second)
-    "debug_ik": False,         # Enable IK debug output
-}
+```bash
+source /opt/ros/jazzy/setup.bash
+ros2 topic list | grep quest
+ros2 topic hz /quest/right_hand/pose   # Should show ~60-90 Hz
+ros2 topic echo /quest/right_hand/pose
 ```
-
-### Server Ports
-
-Edit `config/config.yaml`:
-
-```yaml
-server:
-  host: "0.0.0.0"
-  websocket_port: 9999  # WebSocket for controller data
-  https_port: 8000      # HTTPS for WebXR page
-```
-
-### Deadman Timeout
-
-Edit `config/config.yaml`:
-
-```yaml
-teleop:
-  deadman_timeout_ms: 250  # Hold targets after stale controller data
-  hard_timeout_ms: 1000    # Open grippers after a longer stream loss
-```
-
-### IK Configuration
-
-Each arm has its own IK configuration in `robot_configs/openarm_config/left_arm/` and `robot_configs/openarm_config/right_arm/`:
-
-- `robot_descriptor.yaml` - Lula IK configuration
-- Joint limits, end-effector frame, etc.
 
 ---
 
 ## Next Steps
 
-- See [Troubleshooting](troubleshooting.md) if you encounter issues
+- See [Troubleshooting](troubleshooting.md) if you encounter issues.
+- To add a new robot, create a `config/robots/<name>.yaml`, a `src/robot_adapters/<name>.py`
+  implementing `RobotAdapter`, and a `scripts/run_<name>_teleop.sh`.
