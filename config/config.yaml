@@ -1,21 +1,12 @@
 # Quest3 Streamer Configuration
 # All paths are relative to project root unless absolute
 
+active_robot: openarm
+
 paths:
   # Isaac Sim installation (absolute path)
   isaac_sim: "/home/saurabh/isaac_sim"
-  
-  # OpenArm robot configuration
-  openarm:
-    usd: "openarm_config/openarm_bimanual/openarm_bimanual.usd"
-    urdf: "openarm_config/openarm_bimanual_stl.urdf"
-    left_arm_config: "openarm_config/left_arm"
-    right_arm_config: "openarm_config/right_arm"
-  
-  # Panda robot configuration
-  panda:
-    usd: "environment.usd"
-  
+
   # SSL certificates
   certs:
     cert: "certs/cert.pem"
@@ -23,5 +14,88 @@ paths:
 
 # Server configuration
 server:
-  websocket_port: 9090
+  host: "0.0.0.0"
+  websocket_port: 9999
   https_port: 8000
+
+# Local LAN configuration (used by run_lan_teleop.sh)
+# Set robot_pc_ip to this workstation's LAN IP (e.g. 192.168.1.42).
+# Leave empty to auto-detect (uses hostname -I | awk '{print $1}').
+lan:
+  robot_pc_ip: ""       # auto-detected if empty
+  websocket_port: 9999  # must match server.websocket_port
+  https_port: 8000      # must match server.https_port
+
+# Remote transport / VPN tuning
+transport:
+  log_interval_s: 0.0
+  # Pose prediction extrapolates the target by velocity * horizon to cancel the
+  # residual group delay of the smoothing filter and the one-way transport age.
+  # Bounded by the jump-safety clamp, so it cannot yank the arm. Tune horizon to
+  # roughly match the measured one-way latency (watch left_browser_age_ms).
+  enable_prediction: true
+  prediction_horizon_ms: 40
+  jitter_buffer_frames: 0
+  forward_queue_size: 64
+  forward_retry_interval_s: 2.0
+  remote_receiver:
+    host: "0.0.0.0"
+    port: 9998
+
+# Isaac Sim launcher defaults
+isaac:
+  headless: false
+  width: 1920
+  height: 1080
+  window_width: 1920
+  window_height: 1080
+  warmup_updates: 30
+  stage_stabilization_updates: 50
+  world_stabilization_updates: 20
+  post_reset_updates: 20
+  hide_ui_panels: true
+  hidden_windows:
+    - "Stage"
+    - "Layer"
+    - "Render Settings"
+    - "Content"
+    - "Content Library"
+    - "Console"
+    - "Property"
+    - "Properties"
+    - "Semantics"
+    - "Visual Scripting"
+  target_control_rate_hz: 60
+  render_every_n_steps: 1
+
+# Camera capture and ROS image publishing
+cameras:
+  enabled: true
+  resolution: [640, 480]
+  publish_interval_frames: 2
+  queue_size: 10
+  log_errors: true
+  error_log_interval_s: 5.0
+
+recording:
+  enabled: false
+  dataset_format: "v3.0"
+  root: "datasets"
+  repo_id: "local/quest3-openarm"
+  task: "Teleoperate OpenArm to complete the task"
+  fps: 30
+  max_episodes: null
+  verbose: false
+  encoder_threads: 4
+  image_writer_threads: 4
+  auto_start_episode: false
+  deferred_rendering: true
+  cameras:
+    resolution: [640, 480]
+  buttons:
+    switch_camera: "right_primary"
+    reset_scene: "right_secondary"
+    save_episode: "left_primary"
+    start_episode: "left_secondary"
+
+

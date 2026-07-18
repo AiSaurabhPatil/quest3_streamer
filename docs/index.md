@@ -53,7 +53,7 @@ quest3_streamer/
 │   ├── run_panda_teleop.sh       # Launch Panda teleop
 │   ├── run_wireless.sh           # Launch wireless streaming
 │   └── generate_cert.sh          # Generate SSL certificates
-├── openarm_config/           # OpenArm robot config (USD, URDF)
+├── robot_configs/openarm_config/           # OpenArm robot config (USD, URDF)
 ├── certs/                    # SSL certificates (gitignored)
 └── docs/                     # This documentation
 ```

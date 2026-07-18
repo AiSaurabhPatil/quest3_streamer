@@ -3,8 +3,9 @@ import http.server
 import ssl
 import sys
 import os
+import argparse
 
-def run_server(port=8000):
+def run_server(port=8000, cert_file="certs/cert.pem", key_file="certs/key.pem"):
     # Get project root (parent of web/)
     script_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.dirname(script_dir)
@@ -18,10 +19,10 @@ def run_server(port=8000):
     # Wrap the socket with SSL
     try:
         context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-        context.load_cert_chain(certfile="certs/cert.pem", keyfile="certs/key.pem")
+        context.load_cert_chain(certfile=cert_file, keyfile=key_file)
         httpd.socket = context.wrap_socket(httpd.socket, server_side=True)
     except FileNotFoundError:
-        print("❌ Error: certs/cert.pem or certs/key.pem not found.")
+        print(f"❌ Error: {cert_file} or {key_file} not found.")
         print("   Run './scripts/generate_cert.sh' first.")
         sys.exit(1)
 
@@ -31,7 +32,9 @@ def run_server(port=8000):
     httpd.serve_forever()
 
 if __name__ == "__main__":
-    port = 8000
-    if len(sys.argv) > 1:
-        port = int(sys.argv[1])
-    run_server(port)
+    parser = argparse.ArgumentParser(description="HTTPS static server for Quest WebXR")
+    parser.add_argument("port", nargs="?", type=int, default=8000)
+    parser.add_argument("--cert", default="certs/cert.pem", help="Path to SSL certificate")
+    parser.add_argument("--key", default="certs/key.pem", help="Path to SSL key")
+    args = parser.parse_args()
+    run_server(args.port, args.cert, args.key)

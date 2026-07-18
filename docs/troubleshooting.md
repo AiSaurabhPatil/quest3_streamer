@@ -27,7 +27,7 @@ https://<YOUR_PC_IP>:8000/web/webxr_streamer.html
 |-------|----------|
 | ROS bridge not running | Run `./scripts/run_wireless.sh` or `python src/webxr_ros_bridge.py` |
 | Wrong IP address | Enter your PC's correct IP in the WebXR form |
-| Firewall blocking | Allow ports 8000 and 9090 through firewall |
+| Firewall blocking | Allow ports 8000 and 9999 through firewall |
 | Different WiFi networks | Ensure Quest and PC are on same network |
 
 **Debug Steps**:
@@ -39,14 +39,14 @@ https://<YOUR_PC_IP>:8000/web/webxr_streamer.html
 
 2. Test WebSocket port:
    ```bash
-   curl -v https://localhost:9090 --insecure
+   curl -v https://localhost:9999 --insecure
    ```
 
 3. Check firewall:
    ```bash
    sudo ufw status
    sudo ufw allow 8000
-   sudo ufw allow 9090
+   sudo ufw allow 9999
    ```
 
 ---
@@ -173,13 +173,13 @@ The robot will hold its last successful position when IK fails.
 2. **Sourced system ROS before Isaac Sim**:
    ```bash
    # DON'T do this before running Isaac Sim scripts:
-   source /opt/ros/humble/setup.bash
+   source /opt/ros/jazzy/setup.bash  # or humble depending on your distro
    
    # Isaac Sim has its own ROS setup
    ```
 
 3. **Missing USD file**:
-   Check that `openarm_config/openarm_bimanual/openarm_bimanual.usd` exists.
+   Check that `robot_configs/openarm_config/openarm_bimanual/openarm_bimanual_env.usd` exists.
 
 ---
 

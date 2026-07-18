@@ -17,7 +17,7 @@ Complete guide to set up the Quest 3 VR Teleoperation project.
 
 | Software | Version | Purpose |
 |----------|---------|---------|
-| ROS 2 Humble | Latest | Robot communication |
+| ROS 2 Jazzy or Humble | Latest | Robot communication |
 | Python | 3.10+ | Bridge and teleop scripts |
 | NVIDIA Isaac Sim | 5.0.0+ | Robot simulation |
 | Meta Quest Browser | Latest | WebXR client |
@@ -118,10 +118,10 @@ paths:
   
   # OpenArm robot configuration
   openarm:
-    usd: "openarm_config/openarm_bimanual/openarm_bimanual.usd"
-    urdf: "openarm_config/openarm_bimanual_stl.urdf"
-    left_arm_config: "openarm_config/left_arm"
-    right_arm_config: "openarm_config/right_arm"
+    usd: "robot_configs/openarm_config/openarm_bimanual/openarm_bimanual_env.usd"
+    urdf: "robot_configs/openarm_config/openarm_bimanual_stl.urdf"
+    left_arm_config: "robot_configs/openarm_config/left_arm"
+    right_arm_config: "robot_configs/openarm_config/right_arm"
   
   # Panda robot configuration
   panda:
@@ -134,8 +134,14 @@ paths:
 
 # Server configuration
 server:
-  websocket_port: 9090
+  host: "0.0.0.0"
+  websocket_port: 9999
   https_port: 8000
+
+# Teleoperation safety configuration
+teleop:
+  deadman_timeout_ms: 250
+  hard_timeout_ms: 1000
 ```
 
 ## Next Steps

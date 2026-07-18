@@ -3,3 +3,6 @@ __pycache__/
 *.pyc
 .DS_Store
 certs/
+recordings/controller_streams/
+
+datasets/

@@ -14,7 +14,7 @@ This single command:
 
 1. Generates SSL certificates if missing
 2. Starts HTTPS server on port 8000
-3. Starts WebSocket ROS bridge on port 9090
+3. Starts WebSocket ROS bridge on port 9999
 4. Prints the URL for your Quest browser
 
 ### Connect From Quest 3
@@ -34,7 +34,7 @@ You should see the AR passthrough view and controller tracking status.
 In a new terminal:
 
 ```bash
-source /opt/ros/humble/setup.bash
+source /opt/ros/jazzy/setup.bash  # or humble depending on your distro
 ros2 topic list | grep quest
 
 # Should show:
@@ -49,6 +49,26 @@ Echo a topic to see live data:
 ```bash
 ros2 topic echo /quest/right_hand/pose
 ```
+
+### Remote Isaac Server Over VPN
+
+If Isaac Sim is running on a remote machine, keep the Quest talking to a nearby ingress and forward compact controller packets over the VPN:
+
+```bash
+# Local machine near the Quest
+python src/webxr_ros_bridge.py \
+  --mode ingress \
+  --host 0.0.0.0 \
+  --port 9999 \
+  --cert certs/cert.pem \
+  --key certs/key.pem \
+  --forward-url ws://<REMOTE_SERVER_IP>:9998
+
+# Remote machine near Isaac Sim
+python src/webxr_ros_bridge.py --mode remote-receiver --host 0.0.0.0 --port 9998
+```
+
+The transport bridge logs packet rate, drop percentage, jitter, end-to-end packet age, and VPN hop age to help diagnose remote-control issues.
 
 ---
 
@@ -99,7 +119,37 @@ The A/X buttons cycle through available cameras:
 
 ### Data Recording (LeRobot)
 
-The OpenArm teleop script publishes data for recording:
+The OpenArm teleop script can record episodes directly into a LeRobot dataset:
+
+```bash
+./scripts/run_openarm_teleop.sh \
+  --record \
+  --dataset-root datasets \
+  --dataset-repo-id local/quest3-openarm \
+  --task "Teleoperate OpenArm to complete the task" \
+  --recording-fps 30 \
+  --max-episodes 10
+```
+
+Recording uses a separate LeRobot writer process so Isaac Sim's Python environment
+does not need LeRobot installed. By default the writer runs with `.venv/bin/python`;
+override it with `LEROBOT_RECORDING_PYTHON` if you keep LeRobot elsewhere. Use a
+dedicated worker environment when you need a specific LeRobotDataset format:
+
+```bash
+uv venv .venv-lerobot-v21 --python 3.10
+uv pip install --python .venv-lerobot-v21/bin/python "lerobot==0.3.2"
+LEROBOT_RECORDING_PYTHON=$PWD/.venv-lerobot-v21/bin/python ./scripts/run_openarm_teleop.sh --record
+```
+
+Set `recording.dataset_format` to `v3.0`, `v2.1`, or `auto`. `auto` uses the
+format written by the selected LeRobot worker.
+
+Recorded camera videos default to 224x224 for pi0.5 training. The Isaac camera
+capture resolution defaults to the same size so the written videos match the
+LeRobot feature schema.
+
+The OpenArm teleop script also publishes data for external recording:
 
 | Topic | Type | Description |
 |-------|------|-------------|
@@ -109,6 +159,7 @@ The OpenArm teleop script publishes data for recording:
 | `/camera/wrist_right/image_raw` | `Image` | Right wrist camera |
 
 Camera images are published asynchronously at ~15 Hz to avoid performance impact.
+The default camera image size is 224x224 RGB.
 
 ---
 
@@ -168,7 +219,7 @@ buttons[3] = Thumbstick click
 | Topic | Type | Description |
 |-------|------|-------------|
 | `/joint_states` | `sensor_msgs/JointState` | Robot joint positions |
-| `/camera/head/image_raw` | `sensor_msgs/Image` | Head camera (480x360 RGB) |
+| `/camera/head/image_raw` | `sensor_msgs/Image` | Head camera (224x224 RGB by default) |
 | `/camera/wrist_left/image_raw` | `sensor_msgs/Image` | Left wrist camera |
 | `/camera/wrist_right/image_raw` | `sensor_msgs/Image` | Right wrist camera |
 
@@ -197,13 +248,24 @@ Edit `config/config.yaml`:
 
 ```yaml
 server:
-  websocket_port: 9090  # WebSocket for controller data
+  host: "0.0.0.0"
+  websocket_port: 9999  # WebSocket for controller data
   https_port: 8000      # HTTPS for WebXR page
+```
+
+### Deadman Timeout
+
+Edit `config/config.yaml`:
+
+```yaml
+teleop:
+  deadman_timeout_ms: 250  # Hold targets after stale controller data
+  hard_timeout_ms: 1000    # Open grippers after a longer stream loss
 ```
 
 ### IK Configuration
 
-Each arm has its own IK configuration in `openarm_config/left_arm/` and `openarm_config/right_arm/`:
+Each arm has its own IK configuration in `robot_configs/openarm_config/left_arm/` and `robot_configs/openarm_config/right_arm/`:
 
 - `robot_descriptor.yaml` - Lula IK configuration
 - Joint limits, end-effector frame, etc.

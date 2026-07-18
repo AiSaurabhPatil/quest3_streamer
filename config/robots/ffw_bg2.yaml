@@ -1,0 +1,174 @@
+robot_type: ffw_bg2
+display_name: "FFW BG2"
+articulation_name: "ffw_bg2"
+usd: "robot_configs/ffw_bg2_config/Collected_ffw_bg2_env_v2/ffw_bg2_env_v2.usd"
+urdf: "robot_configs/ffw_bg2_config/ffw_bg2.urdf"
+left_arm_config: "robot_configs/ffw_bg2_config/left_arm"
+right_arm_config: "robot_configs/ffw_bg2_config/right_arm"
+
+prim_search_paths:
+  - "/World/FFW_BG2/ffw_bg2_follower"
+  - "/World/FFW_BG2"
+  - "/ffw_bg2_follower"
+  - "/World/Robot"
+  - "/Robot"
+
+left_arm:
+  frame_name: "left_tcp"
+  joints:
+    - "arm_l_joint1"
+    - "arm_l_joint2"
+    - "arm_l_joint3"
+    - "arm_l_joint4"
+    - "arm_l_joint5"
+    - "arm_l_joint6"
+    - "arm_l_joint7"
+  preferred_config: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+
+right_arm:
+  frame_name: "right_tcp"
+  joints:
+    - "arm_r_joint1"
+    - "arm_r_joint2"
+    - "arm_r_joint3"
+    - "arm_r_joint4"
+    - "arm_r_joint5"
+    - "arm_r_joint6"
+    - "arm_r_joint7"
+  preferred_config: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+
+grippers:
+  open_position: 0.0
+  closed_position: 1.0
+  speed: 0.05
+  threshold: 0.5
+  left_joints:
+    - "gripper_l_joint1"
+    - "gripper_l_joint2"
+    - "gripper_l_joint3"
+    - "gripper_l_joint4"
+  right_joints:
+    - "gripper_r_joint1"
+    - "gripper_r_joint2"
+    - "gripper_r_joint3"
+    - "gripper_r_joint4"
+
+cameras:
+  head_camera:
+    prim_path: "/World/FFW_BG2/ffw_bg2_follower/head/head_link2/head_camera"
+    topic: "/camera/head_camera/image_raw"
+  left_wrist_camera:
+    prim_path: "/World/FFW_BG2/ffw_bg2_follower/left_arm/arm_l_link7/left_wrist_camera"
+    topic: "/camera/left_wrist_camera/image_raw"
+  right_wrist_camera:
+    prim_path: "/World/FFW_BG2/ffw_bg2_follower/right_arm/arm_r_link7/right_wrist_camera"
+    topic: "/camera/right_wrist_camera/image_raw"
+  perspective_camera:
+    prim_path: "/OmniverseKit_Persp"
+    topic: "/camera/perspective_camera/image_raw"
+
+ik:
+  orientation_mode: "full_pose"
+  orientation_fallback_to_position: true
+
+teleop:
+  calibration_samples: 30
+  position_scale: [1.0, 1.0, 1.0]
+  workspace_center: [0.3, 0.0, 0.3]
+  smoothing:
+    position_tau_s: 0.10
+    orientation_tau_s: 0.10
+    position_alpha: 0.9
+    orientation_alpha: 0.9
+  deadman_timeout_ms: 1000
+  hard_timeout_ms: 1000
+  max_target_jump_m: 0.50
+  max_target_velocity_mps: 1.5
+  stale_recovery_alpha: 0.5
+
+recording:
+  robot_type: ffw_bg2
+  joint_groups:
+    left_arm:
+      source: articulation
+      joints:
+        - "arm_l_joint1"
+        - "arm_l_joint2"
+        - "arm_l_joint3"
+        - "arm_l_joint4"
+        - "arm_l_joint5"
+        - "arm_l_joint6"
+        - "arm_l_joint7"
+    right_arm:
+      source: articulation
+      joints:
+        - "arm_r_joint1"
+        - "arm_r_joint2"
+        - "arm_r_joint3"
+        - "arm_r_joint4"
+        - "arm_r_joint5"
+        - "arm_r_joint6"
+        - "arm_r_joint7"
+    left_gripper_scalar:
+      source: adapter
+      name: "left_gripper"
+      value: "normalized_gripper"
+      side: "left"
+    right_gripper_scalar:
+      source: adapter
+      name: "right_gripper"
+      value: "normalized_gripper"
+      side: "right"
+
+domain_randomization:
+  enabled: true
+  seed: null
+  settle_steps: 30
+  
+  objects:
+    bounds:
+      # If corner prims (/World/corner_01, etc.) exist on the stage, the randomizer fetches their
+      # positions at runtime to define the placement box. Otherwise, it falls back to:
+      reference_prim: "/World/Kitchen/background/benchmark_kitchen_island_000"
+      center_area_scale: [0.8, 0.8]
+      fallback_table_bounds_m:
+        x: [-0.4, 0.4]
+        y: [-0.3, 0.3]
+    
+    # Minimum clearance/distance constraint to prevent objects from colliding
+    min_distance_m: 0.18
+    
+    # List of randomized objects with their footprint/collision properties
+    items:
+      - path: "/World/Bowl"
+        radius_m: 0.11
+        yaw_deg: [-30.0, 30.0]
+        z_offset_m: 0.0
+      - path: "/World/Apple"
+        radius_m: 0.05
+        yaw_deg: [-180.0, 180.0]
+        z_offset_m: 0.0
+
+  lighting:
+    # List of lights to randomize (RectLights)
+    lights:
+      - path: "/World/Kitchen/light/RectLight"
+        intensity: [0.0, 15000.0]
+        exposure_jitter: [-0.5, 0.5]
+        color_temperature: [4500.0, 7000.0]
+      - path: "/World/Kitchen/light/RectLight_01"
+        intensity: [0.0, 15000.0]
+        exposure_jitter: [-0.5, 0.5]
+        color_temperature: [4500.0, 7000.0]
+      - path: "/World/Kitchen/light/RectLight_02"
+        intensity: [0.0, 15000.0]
+        exposure_jitter: [-0.5, 0.5]
+        color_temperature: [4500.0, 7000.0]
+      - path: "/World/Kitchen/light/RectLight_03"
+        intensity: [0.0, 15000.0]
+        exposure_jitter: [-0.5, 0.5]
+        color_temperature: [4500.0, 7000.0]
+      - path: "/World/Kitchen/light/RectLight_04"
+        intensity: [0.0, 15000.0]
+        exposure_jitter: [-0.5, 0.5]
+        color_temperature: [4500.0, 7000.0]

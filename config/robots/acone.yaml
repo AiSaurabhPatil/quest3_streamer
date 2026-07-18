@@ -1,0 +1,148 @@
+robot_type: acone
+display_name: "AC One"
+articulation_name: "acone"
+usd: "robot_configs/acone_config/Collected_acone_scene_v3/acone_scene_v3.usd"
+urdf: "robot_configs/acone_config/acone_with_tcp.urdf"
+left_arm_config: "robot_configs/acone_config/left_arm"
+right_arm_config: "robot_configs/acone_config/right_arm"
+
+prim_search_paths:
+  - "/acone"
+  - "/World/ACone"
+  - "/World/Robot"
+  - "/Robot"
+
+left_arm:
+  frame_name: "left_tcp"
+  joints:
+    - "left_joint1"
+    - "left_joint2"
+    - "left_joint3"
+    - "left_joint4"
+    - "left_joint5"
+    - "left_joint6"
+  preferred_config: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+
+right_arm:
+  frame_name: "right_tcp"
+  joints:
+    - "right_joint11"
+    - "right_joint12"
+    - "right_joint13"
+    - "right_joint14"
+    - "right_joint15"
+    - "right_joint16"
+  preferred_config: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+
+grippers:
+  open_position: 0.04
+  closed_position: 0.0
+  speed: 0.02
+  threshold: 0.5
+  left_joints:
+    - "left_joint7"
+    - "left_joint8"
+  right_joints:
+    - "right_joint17"
+    - "right_joint18"
+
+cameras:
+  head_camera:
+    prim_path: "/World/ACone/Geometry/base_link/head_camera"
+    topic: "/camera/head_camera/image_raw"
+  left_wrist_camera:
+    prim_path: "/World/ACone/Geometry/base_link/left_link1/left_link2/left_link3/left_link4/left_link5/left_link6/left_wrist_camera"
+    topic: "/camera/left_wrist_camera/image_raw"
+  right_wrist_camera:
+    prim_path: "/World/ACone/Geometry/base_link/right_link11/right_link12/right_link13/right_link14/right_link15/right_link16/right_wrist_camera"
+    topic: "/camera/right_wrist_camera/image_raw"
+  perspective_camera:
+    prim_path: "/OmniverseKit_Persp"
+    topic: "/camera/perspective_camera/image_raw"
+
+ik:
+  orientation_mode: "full_pose"
+  position_tolerance: 0.003
+  orientation_tolerance: 0.25
+  orientation_fallback_to_position: true
+
+teleop:
+  calibration_samples: 30
+  position_scale: [1.0, 1.0, 1.0]
+  workspace_center: [0.3, 0.0, 0.3]
+  smoothing:
+    position_tau_s: 0.10
+    orientation_tau_s: 0.10
+    position_alpha: 0.9
+    orientation_alpha: 0.9
+  deadman_timeout_ms: 500
+  hard_timeout_ms: 1000
+  max_target_jump_m: 0.25
+  max_target_velocity_mps: 0.4
+  stale_recovery_alpha: 0.5
+
+recording:
+  robot_type: acone
+  joint_groups:
+    left_arm:
+      source: articulation
+      joints:
+        - "left_joint1"
+        - "left_joint2"
+        - "left_joint3"
+        - "left_joint4"
+        - "left_joint5"
+        - "left_joint6"
+    right_arm:
+      source: articulation
+      joints:
+        - "right_joint11"
+        - "right_joint12"
+        - "right_joint13"
+        - "right_joint14"
+        - "right_joint15"
+        - "right_joint16"
+    left_gripper_scalar:
+      source: adapter
+      name: "left_gripper"
+      value: "normalized_gripper"
+      side: "left"
+    right_gripper_scalar:
+      source: adapter
+      name: "right_gripper"
+      value: "normalized_gripper"
+      side: "right"
+
+# domain_randomization:
+#   enabled: true
+#   seed: null
+#   settle_steps: 30
+#   objects:
+#     bounds:
+#       reference_prim: "/World/OakTableSmall"
+#       center_area_scale: [0.8, 0.8]
+#       fallback_table_bounds_m:
+#         x: [-0.4, 0.4]
+#         y: [-0.3, 0.3]
+#     min_distance_m: 0.18
+#     items:
+#       - path: "/World/nut"
+#         radius_m: 0.05
+#         yaw_deg: [-180.0, 180.0]
+#         z_offset_m: 0.0
+#         scale: [3.0, 3.0, 4.0]
+#       - path: "/World/bolt"
+#         radius_m: 0.05
+#         yaw_deg: [-180.0, 180.0]
+#         z_offset_m: 0.0
+#         scale: 3.0
+#       - path: "/World/Bin_B04_20x35x14cm_PR_V_NVD_01"
+#         radius_m: 0.15
+#         yaw_deg: [-20.0, 20.0]
+#         z_offset_m: 0.0
+#   lighting:
+#     lights:
+#       - path: "/World/Environment/DistantLight"
+#         intensity: [1000.0, 5000.0]
+#         exposure_jitter: [-0.5, 0.5]
+#         color_temperature: [4500.0, 7000.0]
