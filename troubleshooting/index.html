@@ -1,0 +1,1636 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="VR teleoperation and dataset recording platform for NVIDIA Isaac Sim 6.0. Control bimanual robots with a Meta Quest 3 and record LeRobot v3.0 datasets.">
+      
+      
+        <meta name="author" content="Saurabh Patil">
+      
+      
+      
+        <link rel="prev" href="../usage/">
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Troubleshooting - TeleSim — VR Teleoperation & Dataset Collection</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="teal" data-md-color-accent="purple">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#troubleshooting" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="TeleSim — VR Teleoperation &amp; Dataset Collection" class="md-header__button md-logo" aria-label="TeleSim — VR Teleoperation & Dataset Collection" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            TeleSim — VR Teleoperation & Dataset Collection
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Troubleshooting
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="teal" data-md-color-accent="purple"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="teal" data-md-color-accent="lime"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/AiSaurabhPatil/telesim" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    AiSaurabhPatil/telesim
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../installation/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Installation
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../usage/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Usage
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="./" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Troubleshooting
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="TeleSim — VR Teleoperation &amp; Dataset Collection" class="md-nav__button md-logo" aria-label="TeleSim — VR Teleoperation & Dataset Collection" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    TeleSim — VR Teleoperation & Dataset Collection
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/AiSaurabhPatil/telesim" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    AiSaurabhPatil/telesim
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Usage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#connection-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Connection Issues
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Connection Issues">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#404-error-on-quest-browser" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        404 Error on Quest Browser
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#err_cert_common_name_invalid-on-quest-browser" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ERR_CERT_COMMON_NAME_INVALID on Quest Browser
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#websocket-disconnected" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WebSocket Disconnected
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#webxr-not-available" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "WebXR Not Available"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#certificate-warning-wont-go-away" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Certificate Warning Won't Go Away
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#calibration-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Calibration Issues
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Calibration Issues">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#calibration-never-completes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Calibration Never Completes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#no-quest-controller-data-received" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "No Quest controller data received"
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#isaac-sim-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Isaac Sim Issues
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Isaac Sim Issues">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#isaac-sim-wont-start-exits-immediately" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Isaac Sim Won't Start / Exits Immediately
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#robot-moves-erratically-jitters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Robot Moves Erratically / Jitters
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ik-failures-arm-not-moving" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        IK Failures / Arm Not Moving
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#control-loop-rate-below-target" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Control Loop Rate Below Target
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#black-frozen-viewport" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Black / Frozen Viewport
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#recording-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recording Issues
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Recording Issues">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#recording-worker-fails-to-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recording Worker Fails to Start
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deferred-renderer-replays-too-fast-or-too-slow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deferred Renderer Replays Too Fast or Too Slow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#scene-not-matching-original-teleop-domain-randomization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scene Not Matching Original Teleop (Domain Randomization)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dataset-episodes-not-being-saved" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dataset Episodes Not Being Saved
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#camera-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Camera Issues
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Camera Issues">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cameras-not-publishing-no-camera-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cameras Not Publishing / No Camera Data
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#performance-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Performance Issues
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Performance Issues">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#high-packet-drop-rate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        High Packet Drop Rate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#high-end-to-end-latency" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        High End-to-End Latency
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#getting-help" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Getting Help
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#connection-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Connection Issues
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Connection Issues">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#404-error-on-quest-browser" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        404 Error on Quest Browser
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#err_cert_common_name_invalid-on-quest-browser" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ERR_CERT_COMMON_NAME_INVALID on Quest Browser
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#websocket-disconnected" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WebSocket Disconnected
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#webxr-not-available" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "WebXR Not Available"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#certificate-warning-wont-go-away" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Certificate Warning Won't Go Away
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#calibration-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Calibration Issues
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Calibration Issues">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#calibration-never-completes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Calibration Never Completes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#no-quest-controller-data-received" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "No Quest controller data received"
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#isaac-sim-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Isaac Sim Issues
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Isaac Sim Issues">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#isaac-sim-wont-start-exits-immediately" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Isaac Sim Won't Start / Exits Immediately
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#robot-moves-erratically-jitters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Robot Moves Erratically / Jitters
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ik-failures-arm-not-moving" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        IK Failures / Arm Not Moving
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#control-loop-rate-below-target" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Control Loop Rate Below Target
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#black-frozen-viewport" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Black / Frozen Viewport
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#recording-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recording Issues
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Recording Issues">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#recording-worker-fails-to-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recording Worker Fails to Start
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deferred-renderer-replays-too-fast-or-too-slow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deferred Renderer Replays Too Fast or Too Slow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#scene-not-matching-original-teleop-domain-randomization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scene Not Matching Original Teleop (Domain Randomization)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dataset-episodes-not-being-saved" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dataset Episodes Not Being Saved
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#camera-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Camera Issues
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Camera Issues">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cameras-not-publishing-no-camera-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cameras Not Publishing / No Camera Data
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#performance-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Performance Issues
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Performance Issues">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#high-packet-drop-rate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        High Packet Drop Rate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#high-end-to-end-latency" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        High End-to-End Latency
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#getting-help" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Getting Help
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="troubleshooting">Troubleshooting</h1>
+<p>Common issues and their solutions for TeleSim — covering connection, calibration, Isaac Sim, recording, and performance.</p>
+<hr />
+<h2 id="connection-issues">Connection Issues</h2>
+<h3 id="404-error-on-quest-browser">404 Error on Quest Browser</h3>
+<p><strong>Symptoms</strong>: "File not found" or 404 error when accessing the WebXR page.</p>
+<p><strong>Cause</strong>: Incorrect URL — the <code>web/</code> subdirectory prefix is required.</p>
+<p><strong>Solution</strong>: Use the full path:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>https://&lt;WORKSTATION_LAN_IP&gt;:8000/web/webxr_streamer.html
+</code></pre></div></p>
+<hr />
+<h3 id="err_cert_common_name_invalid-on-quest-browser"><code>ERR_CERT_COMMON_NAME_INVALID</code> on Quest Browser</h3>
+<p><strong>Symptoms</strong>: Quest browser shows a security error and refuses to load the page.</p>
+<p><strong>Cause</strong>: The SSL certificate was generated without the workstation's current LAN IP as a Subject
+Alternative Name (SAN). This happens when the IP changes (e.g., after reconnecting to WiFi) or
+when the cert was generated on a different machine.</p>
+<p><strong>Solution</strong>: Regenerate the certificate with the correct SAN:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>rm<span class="w"> </span>-f<span class="w"> </span>certs/cert.pem<span class="w"> </span>certs/key.pem
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>bash<span class="w"> </span>scripts/generate_cert.sh<span class="w">    </span><span class="c1"># auto-detects your LAN IP</span>
+</code></pre></div>
+<p>Then restart the HTTPS server and re-navigate on the Quest.</p>
+<hr />
+<h3 id="websocket-disconnected">WebSocket Disconnected</h3>
+<p><strong>Symptoms</strong>: "WebSocket: Disconnected" shown in the WebXR app.</p>
+<p><strong>Possible Causes &amp; Solutions</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Cause</th>
+<th>Solution</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Bridge not running</td>
+<td>Run <code>./scripts/run_lan_teleop.sh --robot acone</code> or start the bridge manually</td>
+</tr>
+<tr>
+<td>Wrong workstation IP</td>
+<td>Confirm IP with <code>hostname -I | awk '{print $1}'</code></td>
+</tr>
+<tr>
+<td>Firewall blocking ports</td>
+<td>Allow ports 8000 and 9999</td>
+</tr>
+<tr>
+<td>Quest and PC on different WiFi networks</td>
+<td>Ensure both are on the same SSID</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Debug Steps</strong>:</p>
+<ol>
+<li>
+<p>Check if bridge is running:
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>ps<span class="w"> </span>aux<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>webxr_bridge
+</code></pre></div></p>
+</li>
+<li>
+<p>Test the WebSocket port:
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>curl<span class="w"> </span>-v<span class="w"> </span>https://localhost:9999<span class="w"> </span>--insecure
+</code></pre></div></p>
+</li>
+<li>
+<p>Check and open firewall:
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>sudo<span class="w"> </span>ufw<span class="w"> </span>status
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>sudo<span class="w"> </span>ufw<span class="w"> </span>allow<span class="w"> </span><span class="m">8000</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>sudo<span class="w"> </span>ufw<span class="w"> </span>allow<span class="w"> </span><span class="m">9999</span>
+</code></pre></div></p>
+</li>
+</ol>
+<hr />
+<h3 id="webxr-not-available">"WebXR Not Available"</h3>
+<p><strong>Cause</strong>: WebXR requires a <strong>Secure Context</strong> (HTTPS). You cannot use WebXR over plain HTTP
+on remote IPs.</p>
+<p><strong>Solution</strong>:
+- Always use <code>https://</code> URLs
+- Generate certificates: <code>bash scripts/generate_cert.sh</code>
+- Accept the certificate warning in the Quest browser (click Advanced → Proceed)</p>
+<hr />
+<h3 id="certificate-warning-wont-go-away">Certificate Warning Won't Go Away</h3>
+<p><strong>Cause</strong>: Self-signed certificates are not trusted by browsers by default — this is expected.</p>
+<p><strong>Solution</strong>:
+1. Click <strong>Advanced</strong> in the browser warning dialog
+2. Click <strong>Proceed to <code>&lt;IP&gt;</code> (unsafe)</strong></p>
+<p>This is safe for local development with self-signed certificates.</p>
+<hr />
+<h2 id="calibration-issues">Calibration Issues</h2>
+<h3 id="calibration-never-completes">Calibration Never Completes</h3>
+<p><strong>Symptoms</strong>: Terminal shows <code>[Calibration] Left: Calibrating (X/30)</code> but never reaches 30.</p>
+<p><strong>Possible Causes &amp; Solutions</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Cause</th>
+<th>Solution</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Not holding controllers steady</td>
+<td>Keep both controllers very still for 1–2 seconds</td>
+</tr>
+<tr>
+<td>Quest not connected</td>
+<td>Verify "WebSocket: Connected" shows in the Quest app</td>
+</tr>
+<tr>
+<td>Moving during calibration</td>
+<td>Wait until <code>CALIBRATION COMPLETE</code> before moving</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Debug</strong>: Watch the terminal for the calibration count:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>[Calibration] Left: Calibrating (15/30) | Right: Calibrating (20/30)
+</code></pre></div></p>
+<hr />
+<h3 id="no-quest-controller-data-received">"No Quest controller data received"</h3>
+<p><strong>Symptoms</strong>: Terminal shows "Waiting for Quest controller data..."</p>
+<p><strong>Debug Steps</strong>:</p>
+<ol>
+<li>
+<p>Check if ROS topics exist:
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nb">source</span><span class="w"> </span>/opt/ros/jazzy/setup.bash
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>ros2<span class="w"> </span>topic<span class="w"> </span>list<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>quest
+</code></pre></div></p>
+</li>
+<li>
+<p>Check if data is flowing:
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>ros2<span class="w"> </span>topic<span class="w"> </span>hz<span class="w"> </span>/quest/right_hand/pose
+</code></pre></div>
+   Should show ~60–90 Hz if working.</p>
+</li>
+<li>
+<p>Verify the WebXR session is active on the Quest (tap "Start AR Session").</p>
+</li>
+<li>Verify the URL uses <code>https://</code> (not <code>http://</code>).</li>
+</ol>
+<hr />
+<h2 id="isaac-sim-issues">Isaac Sim Issues</h2>
+<h3 id="isaac-sim-wont-start-exits-immediately">Isaac Sim Won't Start / Exits Immediately</h3>
+<p><strong>Common Causes</strong>:</p>
+<ol>
+<li>
+<p><strong>Wrong Isaac Sim path</strong> — edit <code>config/config.yaml</code>:
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="nt">paths</span><span class="p">:</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span><span class="nt">isaac_sim</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/correct/absolute/path/to/isaac_sim&quot;</span>
+</code></pre></div></p>
+</li>
+<li>
+<p><strong>Wrong <code>active_robot</code></strong> — set to one of <code>openarm</code>, <code>acone</code>, <code>ffw_bg2</code>:
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="nt">active_robot</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">acone</span>
+</code></pre></div></p>
+</li>
+<li>
+<p><strong>Missing USD file</strong> — verify the path in <code>config/robots/&lt;robot&gt;.yaml</code> exists under <code>robot_configs/</code>.</p>
+</li>
+<li>
+<p><strong>System ROS sourced before Isaac Sim</strong> — do NOT source <code>/opt/ros/jazzy/setup.bash</code> before
+   running Isaac Sim scripts. Isaac Sim uses its own bundled ROS 2 Jazzy.</p>
+</li>
+</ol>
+<hr />
+<h3 id="robot-moves-erratically-jitters">Robot Moves Erratically / Jitters</h3>
+<p><strong>Solutions</strong>:</p>
+<ol>
+<li>
+<p><strong>Increase smoothing</strong> in <code>config/robots/&lt;robot&gt;.yaml</code>:
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nt">teleop</span><span class="p">:</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="w">  </span><span class="nt">smoothing</span><span class="p">:</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">    </span><span class="nt">position_tau_s</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.15</span><span class="w">   </span><span class="c1"># increase from 0.10</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="w">    </span><span class="nt">orientation_tau_s</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.15</span>
+</code></pre></div></p>
+</li>
+<li>
+<p><strong>Recalibrate</strong>: Restart the script and perform calibration again with controllers held very still.</p>
+</li>
+<li>
+<p><strong>Check controller tracking</strong>: Ensure Quest controllers are visible to the headset cameras (not
+   occluded by your body).</p>
+</li>
+<li>
+<p><strong>Enable pose prediction</strong> in <code>config/config.yaml</code>:
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="nt">transport</span><span class="p">:</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="w">  </span><span class="nt">enable_prediction</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="w">  </span><span class="nt">prediction_horizon_ms</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">40</span><span class="w">  </span><span class="c1"># tune to your age_p50 value</span>
+</code></pre></div></p>
+</li>
+</ol>
+<hr />
+<h3 id="ik-failures-arm-not-moving">IK Failures / Arm Not Moving</h3>
+<p><strong>Symptoms</strong>: Terminal shows <code>IK failed for target: [x, y, z]</code>.</p>
+<p><strong>Cause</strong>: The target position is outside the robot's reachable workspace.</p>
+<p><strong>Solutions</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Action</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Move hands closer to body</td>
+<td>Keeps targets in reachable workspace</td>
+</tr>
+<tr>
+<td>Lower arms</td>
+<td>Prevents reaching above the workspace boundary</td>
+</tr>
+<tr>
+<td>Avoid crossing arms</td>
+<td>Prevents collision configurations</td>
+</tr>
+<tr>
+<td>Recalibrate from a more central pose</td>
+<td>Gives more workspace in all directions</td>
+</tr>
+</tbody>
+</table>
+<p>The robot holds its last successful joint position when IK fails. Adjust your hand position and
+the arm will resume tracking.</p>
+<hr />
+<h3 id="control-loop-rate-below-target">Control Loop Rate Below Target</h3>
+<p><strong>Symptoms</strong>: <code>[Control] loop=42Hz</code> but <code>target_control_rate_hz: 60</code>.</p>
+<p><strong>Solutions</strong>:</p>
+<ol>
+<li>
+<p>Increase <code>render_every_n_steps</code> in <code>config/config.yaml</code>:
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="nt">isaac</span><span class="p">:</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="w">  </span><span class="nt">render_every_n_steps</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span><span class="w">   </span><span class="c1"># render every 2nd physics step</span>
+</code></pre></div>
+   Use <code>4</code> or higher if your GPU is severely bottlenecked.</p>
+</li>
+<li>
+<p>Reduce camera resolution in <code>config/config.yaml</code>:
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="nt">cameras</span><span class="p">:</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="w">  </span><span class="nt">resolution</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">320</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">240</span><span class="p p-Indicator">]</span>
+</code></pre></div></p>
+</li>
+<li>
+<p>Close other GPU-intensive applications.</p>
+</li>
+</ol>
+<hr />
+<h3 id="black-frozen-viewport">Black / Frozen Viewport</h3>
+<p><strong>Solutions</strong>:</p>
+<ol>
+<li>Wait 30–60 seconds on first run — Isaac Sim shader compilation takes time.</li>
+<li>Click in the viewport to focus it, then press <code>F</code> to frame the scene.</li>
+<li>Check GPU memory with <code>nvidia-smi</code> — if VRAM is exhausted, reduce camera resolution or
+   close other applications.</li>
+</ol>
+<hr />
+<h2 id="recording-issues">Recording Issues</h2>
+<h3 id="recording-worker-fails-to-start">Recording Worker Fails to Start</h3>
+<p><strong>Symptoms</strong>: Dataset is not created; terminal shows recording worker errors.</p>
+<p><strong>Diagnosis checklist</strong>:</p>
+<ol>
+<li>
+<p>Verify <code>.venv/bin/python</code> exists:
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>ls<span class="w"> </span>.venv/bin/python
+</code></pre></div></p>
+</li>
+<li>
+<p>Verify LeRobot is installed in the venv:
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="nb">source</span><span class="w"> </span>.venv/bin/activate
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>python<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;import lerobot; print(lerobot.__version__)&quot;</span>
+</code></pre></div>
+   If not: <code>uv pip install -r requirements.txt</code></p>
+</li>
+<li>
+<p>Check the <code>LEROBOT_RECORDING_PYTHON</code> environment variable if you use a custom venv:
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">LEROBOT_RECORDING_PYTHON</span><span class="o">=</span><span class="nv">$PWD</span>/.venv/bin/python
+</code></pre></div></p>
+</li>
+</ol>
+<hr />
+<h3 id="deferred-renderer-replays-too-fast-or-too-slow">Deferred Renderer Replays Too Fast or Too Slow</h3>
+<p><strong>Symptoms</strong>: Robot motion in the rendered dataset looks sped up or slowed down compared to the
+original teleop session.</p>
+<p><strong>Solution</strong>: The renderer auto-detects physics substeps from your config. Override explicitly:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>./scripts/run_deferred_renderer.sh<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="w">  </span>local/quest3-acone<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="w">  </span>local/quest3-acone-rendered<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="w">  </span>--robot-type<span class="w"> </span>acone<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a><span class="w">  </span>--physics-substeps<span class="w"> </span><span class="m">2</span>
+</code></pre></div></p>
+<p>The default formula is: <code>substeps = round(target_control_rate_hz / recording_fps)</code>.
+For <code>60 Hz / 30 fps = 2 substeps</code> per rendered frame.</p>
+<hr />
+<h3 id="scene-not-matching-original-teleop-domain-randomization">Scene Not Matching Original Teleop (Domain Randomization)</h3>
+<p><strong>Symptoms</strong>: Objects in the rendered camera images are in different positions than during teleop.</p>
+<p><strong>Cause</strong>: The sidecar JSON was not written correctly, or the renderer is not finding it.</p>
+<p><strong>Check</strong>: Confirm the sidecar files exist in the source dataset:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>ls<span class="w"> </span>datasets/local/quest3-acone/meta/episodes/
+<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="c1"># Should show: scene_ep_000000.json, scene_ep_000001.json, ...</span>
+</code></pre></div></p>
+<p>If files are missing, the teleop session may have been interrupted before saving. Re-run the
+teleop session and make sure to press <strong>Left Primary</strong> (B/A) to save each episode.</p>
+<hr />
+<h3 id="dataset-episodes-not-being-saved">Dataset Episodes Not Being Saved</h3>
+<p><strong>Symptoms</strong>: After pressing the save button, no new Parquet files appear in the dataset.</p>
+<p><strong>Common Causes</strong>:</p>
+<ul>
+<li>Episode was never <strong>started</strong> — press <strong>Left Secondary</strong> (Y/X) first to start, then <strong>Left Primary</strong> to save.</li>
+<li>Scene was reset (Right Secondary) without saving — this discards the current unsaved episode.</li>
+<li><code>recording.enabled</code> is not set to <code>true</code> and <code>--record</code> flag was not passed.</li>
+</ul>
+<hr />
+<h2 id="camera-issues">Camera Issues</h2>
+<h3 id="cameras-not-publishing-no-camera-data">Cameras Not Publishing / No Camera Data</h3>
+<p><strong>Symptoms</strong>: <code>/camera/*</code> topics exist but no data is published, or topics don't exist.</p>
+<p><strong>Debug</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="nb">source</span><span class="w"> </span>/opt/ros/jazzy/setup.bash
+<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>ros2<span class="w"> </span>topic<span class="w"> </span>list<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>camera
+<a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>ros2<span class="w"> </span>topic<span class="w"> </span>hz<span class="w"> </span>/camera/head_camera/image_raw
+<a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a><span class="c1"># Should show ~15 Hz (publish_interval_frames: 2 at 30 Hz loop)</span>
+</code></pre></div></p>
+<p><strong>Common Causes</strong>:</p>
+<ol>
+<li>
+<p><strong>Wrong USD prim path</strong> — check <code>cameras</code> section in <code>config/robots/&lt;robot&gt;.yaml</code>:
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="nt">cameras</span><span class="p">:</span>
+<a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a><span class="w">  </span><span class="nt">head_camera</span><span class="p">:</span>
+<a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a><span class="w">    </span><span class="nt">prim_path</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/World/ACone/Geometry/base_link/head_camera&quot;</span>
+</code></pre></div>
+   Use Isaac Sim's Stage panel to find the correct prim path.</p>
+</li>
+<li>
+<p><strong>Cameras disabled</strong> — ensure <code>cameras.enabled: true</code> in <code>config/config.yaml</code>.</p>
+</li>
+<li>
+<p><strong>Camera prims not loaded</strong> — if the USD scene doesn't include cameras, they cannot be found.</p>
+</li>
+</ol>
+<hr />
+<h2 id="performance-issues">Performance Issues</h2>
+<h3 id="high-packet-drop-rate">High Packet Drop Rate</h3>
+<p><strong>Symptoms</strong>: <code>[Transport][direct] drop=5%</code> or higher.</p>
+<p><strong>Solutions</strong>:</p>
+<ol>
+<li>Ensure Quest and workstation are on the <strong>same 5 GHz WiFi band</strong> (not 2.4 GHz).</li>
+<li>Reduce distance between Quest and the WiFi access point.</li>
+<li>Check for WiFi channel congestion with <code>sudo iwconfig</code> or a WiFi analyzer app.</li>
+<li>Enable pose prediction to compensate for jitter:
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="nt">transport</span><span class="p">:</span>
+<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a><span class="w">  </span><span class="nt">enable_prediction</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a><span class="w">  </span><span class="nt">prediction_horizon_ms</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">50</span>
+</code></pre></div></li>
+</ol>
+<hr />
+<h3 id="high-end-to-end-latency">High End-to-End Latency</h3>
+<p><strong>Symptoms</strong>: <code>left_browser_age_ms</code> is consistently &gt; 100 ms.</p>
+<p><strong>Solutions</strong>:</p>
+<ol>
+<li>
+<p>Tune prediction horizon to your measured <code>age_p50</code>:
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="nt">transport</span><span class="p">:</span>
+<a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a><span class="w">  </span><span class="nt">prediction_horizon_ms</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">40</span><span class="w">   </span><span class="c1"># set to your age_p50 value</span>
+</code></pre></div></p>
+</li>
+<li>
+<p>Increase control loop rate and reduce rendering overhead:
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="nt">isaac</span><span class="p">:</span>
+<a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a><span class="w">  </span><span class="nt">target_control_rate_hz</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">120</span>
+<a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a><span class="w">  </span><span class="nt">render_every_n_steps</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">4</span>
+</code></pre></div></p>
+</li>
+<li>
+<p>Analyze a captured log for detailed percentile breakdowns:
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a>python<span class="w"> </span>scripts/summarize_metrics.py<span class="w"> </span>/path/to/logfile.txt
+</code></pre></div></p>
+</li>
+</ol>
+<hr />
+<h2 id="getting-help">Getting Help</h2>
+<p>If you're still stuck:</p>
+<ol>
+<li>Capture the full terminal output (including any Python tracebacks).</li>
+<li>Check ROS topic data: <code>ros2 topic echo /topic_name</code></li>
+<li>Review the metrics output for anomalies.</li>
+<li>Open an issue on <a href="https://github.com/AiSaurabhPatil/telesim/issues">GitHub</a> with:</li>
+<li>Error messages and tracebacks</li>
+<li>Steps to reproduce</li>
+<li>System configuration (GPU, Isaac Sim version, OS)</li>
+<li>Output of <code>python src/config_loader.py get --config config/config.yaml active_robot</code></li>
+</ol>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "content.code.copy", "content.code.annotate"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
