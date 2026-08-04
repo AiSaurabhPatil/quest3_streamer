@@ -300,8 +300,8 @@
                     // Button data (Quest Touch controllers layout)
                     // buttons[0] = trigger, buttons[1] = squeeze/grip
                     // buttons[3] = thumbstick click, buttons[4] = A/X, buttons[5] = B/Y
-                    trigger: gamepad.buttons[0]?.value || 0,
-                    squeeze: gamepad.buttons[1]?.value || 0,
+                    trigger: gamepad.buttons[0]?.value || (gamepad.buttons[0]?.pressed ? 1 : 0),
+                    squeeze: gamepad.buttons[1]?.value || (gamepad.buttons[1]?.pressed ? 1 : 0),
                     thumbstick_click: gamepad.buttons[3]?.pressed || false,
                     button_a_x: gamepad.buttons[4]?.pressed || false,
                     button_b_y: gamepad.buttons[5]?.pressed || false,

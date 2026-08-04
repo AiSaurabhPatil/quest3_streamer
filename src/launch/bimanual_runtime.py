@@ -14,6 +14,16 @@ from src.isaac_backend import (
 )
 from src.launch.control_metrics import ControlMetricsReporter
 from src.launch.controller_provider import build_controller_provider_class, import_ros_interfaces
+from src.launch.action_arbitration import (
+    ActionArbiterConfig,
+    ArbitrationResult,
+    BimanualActionArbiter,
+)
+from src.launch.policy_provider import (
+    NullPolicyActionProvider,
+    PolicyActionProvider,
+    PolicyObservation,
+)
 from src.recording import (
     ButtonEdgeMapper,
     LeRobotEpisodeRecorder,
@@ -22,7 +32,7 @@ from src.recording import (
     build_recording_schema,
 )
 from src.robot_adapters import RobotAdapter
-from src.teleop_core import BimanualTeleopSession, TeleopSessionConfig
+from src.teleop_core import BimanualTeleopSession, ClutchInputMapper, ControlMode, TeleopSessionConfig
 
 
 @dataclass
@@ -65,6 +75,7 @@ def run_bimanual_runtime(
     debug_ik: bool,
     recording_config: dict | None = None,
     project_root: str | None = None,
+    policy_provider: PolicyActionProvider | None = None,
 ) -> int:
     robot_display_name = _adapter_display_name(adapter)
     recording_settings = RecordingConfig.from_mapping(
@@ -135,6 +146,18 @@ def run_bimanual_runtime(
         if hasattr(adapter, "configure_runtime_home_from_current_pose"):
             runtime_config = adapter.configure_runtime_home_from_current_pose(runtime_config)
         teleop_session = BimanualTeleopSession(runtime_config)
+        clutch_mapper = ClutchInputMapper(runtime_config.clutch)
+        action_arbiter = BimanualActionArbiter(
+            config=ActionArbiterConfig(
+                mode=runtime_config.control_mode,
+                arbitration=runtime_config.clutch.arbitration,
+                policy_reentry_blend_s=runtime_config.clutch.policy_reentry_blend_s,
+            ),
+            left_indices=list(adapter.left_arm_indices) + list(adapter.left_gripper_indices),
+            right_indices=list(adapter.right_arm_indices) + list(adapter.right_gripper_indices),
+        )
+        policy_provider_is_null = policy_provider is None
+        policy_provider = policy_provider or NullPolicyActionProvider()
 
         print("[Init] Initializing ROS2...")
         rclpy.init()
@@ -178,11 +201,20 @@ def run_bimanual_runtime(
                 print(f"[Recording] Failed to start LeRobot recorder: {exc}")
                 return 1
 
-        _print_ready(adapter, runtime_config, camera_manager, recording_settings)
+        _print_ready(
+            adapter,
+            runtime_config,
+            camera_manager,
+            recording_settings,
+            policy_provider_is_null=policy_provider_is_null,
+        )
         _run_control_loop(
             isaac_app=isaac_app,
             adapter=adapter,
             teleop_session=teleop_session,
+            clutch_mapper=clutch_mapper,
+            action_arbiter=action_arbiter,
+            policy_provider=policy_provider,
             controller_provider=controller_provider,
             joint_state_publisher=joint_state_publisher,
             camera_manager=camera_manager,
@@ -289,6 +321,8 @@ def _print_ready(
     runtime_config: TeleopSessionConfig,
     camera_manager: CameraManager,
     recording_config: RecordingConfig,
+    *,
+    policy_provider_is_null: bool = False,
 ) -> None:
     robot_display_name = _adapter_display_name(adapter)
     print("=" * 60)
@@ -304,6 +338,16 @@ def _print_ready(
     print("  - X -> Save Episode")
     print("  - Y -> Start Episode Recording")
     print(f"  - Deadman Timeout -> {runtime_config.deadman_timeout_s * 1000.0:.0f} ms")
+    print(f"  - Control Mode -> {runtime_config.control_mode.value}")
+    if runtime_config.control_mode != ControlMode.CONTINUOUS:
+        print(
+            "  - Clutch -> "
+            f"button={runtime_config.clutch.button}, "
+            f"arbitration={runtime_config.clutch.arbitration}, "
+            f"policy_reentry_blend={runtime_config.clutch.policy_reentry_blend_s * 1000.0:.0f} ms"
+        )
+        if runtime_config.control_mode == ControlMode.POLICY_INTERVENTION and policy_provider_is_null:
+            print("  - Policy Provider -> null; released arms hold without an external provider")
     print("=" * 60)
     print(
         "[Camera] Viewport cameras: "
@@ -333,6 +377,9 @@ def _run_control_loop(
     isaac_app: IsaacApp,
     adapter: RobotAdapter,
     teleop_session: BimanualTeleopSession,
+    clutch_mapper: ClutchInputMapper,
+    action_arbiter: BimanualActionArbiter,
+    policy_provider: PolicyActionProvider,
     controller_provider,
     joint_state_publisher: JointStatePublisher,
     camera_manager: CameraManager,
@@ -349,6 +396,7 @@ def _run_control_loop(
 ) -> None:
     ik_disabled_reported = False
     joint_unavailable_reported = False
+    policy_error_last_report_s: float | None = None
     quiet_recording = recorder is not None and not recording_settings.verbose
     control_metrics = ControlMetricsReporter(enabled=recorder is None and not debug_ik)
     button_mapper = ButtonEdgeMapper(recording_settings.buttons)
@@ -388,6 +436,7 @@ def _run_control_loop(
         while isaac_app.is_running():
             rclpy.spin_once(controller_provider, timeout_sec=0.0)
             latest_states = controller_provider.latest()
+            clutch_input = clutch_mapper.update(latest_states)
 
             # Measure the actual time since the previous iteration for dt-aware
             # smoothing. The first iteration and any after a long gap (e.g. a
@@ -402,7 +451,22 @@ def _run_control_loop(
                 loop_dt_s = target_dt_s
             prev_iteration_s = now_s
 
-            session_update = teleop_session.update(latest_states, dt_s=loop_dt_s)
+            current_positions = None
+            measured_ee_poses = {}
+            if clutch_input.any_rising:
+                current_positions = adapter.get_current_joint_positions()
+                if current_positions is not None:
+                    measured_ee_poses = adapter.get_current_end_effector_poses(current_positions)
+                    if hasattr(adapter, "sync_ik_warm_start"):
+                        adapter.sync_ik_warm_start(current_positions)
+
+            session_update = teleop_session.update(
+                latest_states,
+                clutch_input=clutch_input,
+                measured_ee_poses=measured_ee_poses,
+                now_s=now_s,
+                dt_s=loop_dt_s,
+            )
             button_events = button_mapper.update(latest_states)
 
             if recorder is not None and _sync_recording_progress(recording_state, recorder, verbose=not quiet_recording):
@@ -416,6 +480,9 @@ def _run_control_loop(
                 teleop_session=teleop_session,
                 camera_manager=camera_manager,
                 domain_randomizer=domain_randomizer,
+                clutch_mapper=clutch_mapper,
+                action_arbiter=action_arbiter,
+                policy_provider=policy_provider,
                 recorder=recorder,
                 recording_state=recording_state,
                 session_ready=session_update.ready,
@@ -437,7 +504,8 @@ def _run_control_loop(
                 next_tick_s = time.monotonic() + target_dt_s
                 continue
 
-            current_positions = adapter.get_current_joint_positions()
+            if current_positions is None:
+                current_positions = adapter.get_current_joint_positions()
             if current_positions is None:
                 if not joint_unavailable_reported:
                     joint_unavailable_reported = True
@@ -453,24 +521,47 @@ def _run_control_loop(
 
             joint_unavailable_reported = False
 
-            action = adapter.compute_action(session_update.targets)
+            human_action = adapter.compute_action(session_update.targets)
             _maybe_print_ik_debug(
                 adapter,
                 teleop_session,
                 session_update,
                 debug_ik,
                 current_positions=current_positions,
-                action_positions=action.joint_positions,
+                action_positions=human_action.joint_positions,
             )
 
             if not ik_enabled and not ik_disabled_reported:
                 print("[INFO] IK disabled; holding arm joints while grippers remain responsive")
                 ik_disabled_reported = True
 
-            adapter.apply_action(action)
+            policy_action = None
+            if teleop_session.config.control_mode == ControlMode.POLICY_INTERVENTION:
+                try:
+                    policy_action = policy_provider.get_action(
+                        PolicyObservation(
+                            joint_positions=np.asarray(current_positions, dtype=float).reshape(-1).copy(),
+                            monotonic_time_s=now_s,
+                        )
+                    )
+                except Exception as exc:
+                    if policy_error_last_report_s is None or now_s - policy_error_last_report_s > 1.0:
+                        print(f"[Policy] Provider failed; holding policy candidate: {exc}")
+                        policy_error_last_report_s = now_s
+                    policy_action = None
+
+            arbitration = action_arbiter.select(
+                current_positions=current_positions,
+                human_action=human_action,
+                policy_action=policy_action,
+                intervention=session_update.intervention,
+                now_s=now_s,
+            )
+
+            adapter.apply_action(arbitration.executed_action)
             teleop_session.mark_isaac_apply()
             stamp = controller_provider.get_clock().now().to_msg()
-            joint_state_publisher.publish(dof_names, action.joint_positions, stamp=stamp)
+            joint_state_publisher.publish(dof_names, arbitration.executed_action.joint_positions, stamp=stamp)
 
             # Determine if this step should record a frame to match the target recording FPS
             if recorder is not None and recording_state.recording_active:
@@ -522,7 +613,8 @@ def _run_control_loop(
                         recording_settings=recording_settings,
                         recording_schema=recording_schema,
                         current_positions=current_positions,
-                        action=action,
+                        arbitration=arbitration,
+                        session_update=session_update,
                         camera_frames=camera_frames or {},
                     )
                 _maybe_print_recording_frame_progress(
@@ -600,6 +692,9 @@ def _handle_button_events(
     teleop_session: BimanualTeleopSession,
     camera_manager: CameraManager,
     domain_randomizer: DomainRandomizer | None,
+    clutch_mapper: ClutchInputMapper,
+    action_arbiter: BimanualActionArbiter,
+    policy_provider: PolicyActionProvider,
     recorder: LeRobotEpisodeRecorder | None,
     recording_state: RecordingLoopState,
     session_ready: bool,
@@ -657,7 +752,16 @@ def _handle_button_events(
             recorder.discard_episode_async(reason="scene_reset")
         if verbose_recording:
             print("[Scene] Reset requested")
-        new_sample = _reset_scene(isaac_app, adapter, teleop_session, domain_randomizer, verbose=verbose_recording)
+        new_sample = _reset_scene(
+            isaac_app,
+            adapter,
+            teleop_session,
+            domain_randomizer,
+            clutch_mapper=clutch_mapper,
+            action_arbiter=action_arbiter,
+            policy_provider=policy_provider,
+            verbose=verbose_recording,
+        )
         # Store the new randomization sample so save_episode_async can persist it.
         recording_state.domain_randomization_sample = new_sample
         return True
@@ -743,13 +847,15 @@ def _maybe_record_frame(
     recording_settings: RecordingConfig,
     recording_schema,
     current_positions,
-    action,
+    arbitration: ArbitrationResult,
+    session_update,
     camera_frames: dict[str, object],
 ) -> None:
     expected_cameras = {camera_spec.camera_name for camera_spec in recording_schema.camera_specs}
     if expected_cameras and expected_cameras.difference(camera_frames):
         return
 
+    action = arbitration.executed_action
     _, state_vector = adapter.get_recording_vector(
         vector_config=recording_settings.state,
         current_joint_positions=current_positions,
@@ -760,16 +866,69 @@ def _maybe_record_frame(
         current_joint_positions=current_positions,
         commanded_action=action,
     )
+    extra_features: dict[str, np.ndarray] = {}
+    if recording_settings.intervention.enabled:
+        extra_features.update(
+            {
+                "action.human_valid": np.asarray([int(arbitration.human_action_valid)], dtype=np.int64),
+                "action.policy_valid": np.asarray([int(arbitration.policy_action_valid)], dtype=np.int64),
+                "control.source": np.asarray([int(arbitration.control_source)], dtype=np.int64),
+                "intervention.active": np.asarray([int(session_update.intervention.active)], dtype=np.int64),
+                "intervention.left": np.asarray([int(arbitration.left_human)], dtype=np.int64),
+                "intervention.right": np.asarray([int(arbitration.right_human)], dtype=np.int64),
+                "intervention.id": np.asarray([int(arbitration.intervention_id)], dtype=np.int64),
+                "intervention.reentry_blend_active": np.asarray([int(arbitration.reentry_blend_active)], dtype=np.int64),
+            }
+        )
+        if recording_settings.intervention.include_candidate_actions:
+            extra_features["action.human"] = _candidate_recording_vector(
+                adapter,
+                recording_settings,
+                current_positions,
+                arbitration.human_action,
+                recording_schema.action_spec.shape,
+            )
+            extra_features["action.policy"] = _candidate_recording_vector(
+                adapter,
+                recording_settings,
+                current_positions,
+                arbitration.policy_action,
+                recording_schema.action_spec.shape,
+            )
 
     recorder.enqueue_frame(
         RecordingFrameSnapshot(
-            state=state_vector,
-            action=action_vector,
+            state=state_vector.copy(),
+            action=action_vector.copy(),
             cameras={name: camera_frames[name] for name in expected_cameras},
+            extra_features={key: value.copy() for key, value in extra_features.items()},
             task=recording_settings.task,
             monotonic_time_s=time.monotonic(),
         )
     )
+
+
+def _candidate_recording_vector(
+    adapter: RobotAdapter,
+    recording_settings: RecordingConfig,
+    current_positions,
+    action,
+    shape: tuple[int, ...],
+) -> np.ndarray:
+    if action is None or not adapter.validate_action(action):
+        return np.zeros(shape, dtype=np.float32)
+    try:
+        _, vector = adapter.get_recording_vector(
+            vector_config=recording_settings.action,
+            current_joint_positions=current_positions,
+            commanded_action=action,
+        )
+    except Exception:
+        return np.zeros(shape, dtype=np.float32)
+    vector = np.asarray(vector, dtype=np.float32).reshape(shape)
+    if not np.all(np.isfinite(vector)):
+        return np.zeros(shape, dtype=np.float32)
+    return vector
 
 
 def _reset_scene(
@@ -777,6 +936,9 @@ def _reset_scene(
     adapter: RobotAdapter,
     teleop_session: BimanualTeleopSession,
     domain_randomizer: DomainRandomizer | None = None,
+    clutch_mapper: ClutchInputMapper | None = None,
+    action_arbiter: BimanualActionArbiter | None = None,
+    policy_provider: PolicyActionProvider | None = None,
     *,
     verbose: bool = True,
 ) -> object:
@@ -789,6 +951,12 @@ def _reset_scene(
     """
     adapter.reset_runtime_state()
     teleop_session.reset(preserve_calibration=True)
+    if clutch_mapper is not None:
+        clutch_mapper.reset()
+    if action_arbiter is not None:
+        action_arbiter.reset()
+    if policy_provider is not None:
+        policy_provider.reset()
 
     sample = None
     # Mutate the USD stage WHILE PHYSICS IS STOPPED. Removing/spawning

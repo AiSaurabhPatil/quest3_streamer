@@ -16,6 +16,16 @@ from .frame_transforms import (
     DEFAULT_VR_TO_ROBOT,
     FrameTransform,
 )
+from .intervention import (
+    BimanualClutchInput,
+    ClutchAnchor,
+    ClutchConfig,
+    ControlMode,
+    EndEffectorPose,
+    HandClutchInput,
+    HandInterventionStatus,
+    InterventionStatus,
+)
 from .retargeting import (
     BimanualTeleopTargets,
     EndEffectorTarget,
@@ -71,8 +81,34 @@ def _relative_target_orientation(
     return _wxyz_from_rotation(current * reference.inv() * home)
 
 
+def _clutched_relative_pose(
+    *,
+    frame_transform: FrameTransform,
+    controller_delta_xr_xyz: np.ndarray,
+    current_controller_orientation_xyzw: np.ndarray,
+    anchor: ClutchAnchor,
+    pos_scale: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Map controller motion in its engagement-heading frame onto the TCP."""
+    robot_delta = frame_transform.position_offset_to_robot_at_heading(
+        controller_delta_xr_xyz,
+        anchor.controller_orientation_xyzw,
+    )
+    target_position = anchor.ee_position_xyz + robot_delta * np.asarray(
+        pos_scale, dtype=float
+    ).reshape(3)
+    target_orientation = frame_transform.relative_orientation_to_robot_wxyz(
+        current_controller_orientation_xyzw,
+        anchor.controller_orientation_xyzw,
+        anchor.ee_orientation_wxyz,
+    )
+    return target_position, target_orientation
+
+
 @dataclass
 class TeleopSessionConfig:
+    control_mode: ControlMode = ControlMode.CONTINUOUS
+    clutch: ClutchConfig = field(default_factory=ClutchConfig)
     pos_scale: np.ndarray = field(default_factory=lambda: np.ones(3, dtype=float))
     robot_workspace_center: np.ndarray = field(
         default_factory=lambda: np.array([0.3, 0.0, 0.3], dtype=float)
@@ -110,6 +146,11 @@ class TeleopSessionConfig:
     stale_recovery_alpha: float = 0.25
 
     def __post_init__(self):
+        if not isinstance(self.control_mode, ControlMode):
+            self.control_mode = ControlMode(str(self.control_mode))
+        if isinstance(self.clutch, Mapping):
+            self.clutch = ClutchConfig.from_mapping(self.clutch)
+        self.clutch = self.clutch.with_enabled(self.control_mode != ControlMode.CONTINUOUS)
         if np.isscalar(self.pos_scale):
             self.pos_scale = np.full(3, float(self.pos_scale), dtype=float)
         else:
@@ -169,7 +210,10 @@ class TeleopSessionConfig:
 
     @classmethod
     def from_dict(cls, values: Mapping[str, object]) -> "TeleopSessionConfig":
-        return cls(**dict(values))
+        values = dict(values)
+        if "clutch" in values and isinstance(values["clutch"], Mapping):
+            values["clutch"] = ClutchConfig.from_mapping(values["clutch"])
+        return cls(**values)
 
 
 @dataclass
@@ -197,6 +241,8 @@ class HandSessionState:
     isaac_apply_epoch_ms: float | None = None
     reference_position: np.ndarray | None = None
     home_position: np.ndarray | None = None
+    clutch_active: bool = False
+    clutch_forced_hold: bool = False
 
 
 @dataclass
@@ -207,6 +253,7 @@ class TeleopSessionUpdate:
     left_state: HandSessionState
     right_state: HandSessionState
     events: list[SessionEvent] = field(default_factory=list)
+    intervention: InterventionStatus = field(default_factory=InterventionStatus)
 
 
 @dataclass
@@ -246,6 +293,9 @@ class _HandRuntime:
         self.last_stale_report_s = 0.0
         self.soft_stale_active = False
         self.hard_timeout_active = False
+        self.clutch_active = False
+        self.clutch_forced_hold = False
+        self.clutch_anchor: ClutchAnchor | None = None
         self.position_filter = (
             PositionEMA(
                 alpha=config.position_alpha if config.position_tau_s is None else None,
@@ -274,11 +324,17 @@ class _HandRuntime:
             maxlen=max(1, config.jitter_buffer_frames + 1)
         )
 
-    def reset_filters(self) -> None:
+    def reset_filters(
+        self,
+        position: np.ndarray | None = None,
+        orientation: np.ndarray | None = None,
+    ) -> None:
+        position = self.target_pos if position is None else np.asarray(position, dtype=float).reshape(3)
+        orientation = self.target_rot if orientation is None else _normalized_quat_wxyz(orientation)
         if self.position_filter is not None:
-            self.position_filter.reset(self.home_position)
+            self.position_filter.reset(position)
         if self.orientation_filter is not None:
-            self.orientation_filter.reset(self.target_rot)
+            self.orientation_filter.reset(orientation)
 
     def reset_runtime_state(self, *, preserve_calibration: bool) -> None:
         if not preserve_calibration:
@@ -297,6 +353,9 @@ class _HandRuntime:
         self.last_stale_report_s = 0.0
         self.soft_stale_active = False
         self.hard_timeout_active = False
+        self.clutch_active = False
+        self.clutch_forced_hold = False
+        self.clutch_anchor = None
         self.pending_states.clear()
         self.reset_filters()
 
@@ -328,21 +387,44 @@ class BimanualTeleopSession:
             config=config,
             calibration=self.calibration.right,
         )
+        self._next_intervention_id = 0
+        self._active_intervention_id = -1
+        self._previous_any_human_active = False
 
     def update(
         self,
         controller_states: Mapping[str, ControllerState | None],
+        *,
+        clutch_input: BimanualClutchInput | None = None,
+        measured_ee_poses: Mapping[str, EndEffectorPose] | None = None,
         now_s: float | None = None,
         dt_s: float | None = None,
     ) -> TeleopSessionUpdate:
         if now_s is None:
             now_s = time.monotonic()
+        clutch_input = clutch_input or BimanualClutchInput()
+        measured_ee_poses = measured_ee_poses or {}
 
         events: list[SessionEvent] = []
-        self._ingest_controller_state(self.left, controller_states.get("left"), events)
-        self._ingest_controller_state(self.right, controller_states.get("right"), events)
+        self._ingest_controller_state(
+            self.left,
+            controller_states.get("left"),
+            events,
+            clutch_input=clutch_input.left,
+            measured_ee_pose=measured_ee_poses.get("left"),
+            now_s=now_s,
+        )
+        self._ingest_controller_state(
+            self.right,
+            controller_states.get("right"),
+            events,
+            clutch_input=clutch_input.right,
+            measured_ee_pose=measured_ee_poses.get("right"),
+            now_s=now_s,
+        )
         self._update_deadman(self.left, now_s, events)
         self._update_deadman(self.right, now_s, events)
+        intervention = self._update_intervention_id()
 
         targets = BimanualTeleopTargets(
             left_ee=EndEffectorTarget(
@@ -366,6 +448,7 @@ class BimanualTeleopSession:
             left_state=self._snapshot(self.left, now_s),
             right_state=self._snapshot(self.right, now_s),
             events=events,
+            intervention=intervention,
         )
 
     def _ingest_controller_state(
@@ -373,6 +456,10 @@ class BimanualTeleopSession:
         runtime: _HandRuntime,
         controller_state: ControllerState | None,
         events: list[SessionEvent],
+        *,
+        clutch_input: HandClutchInput,
+        measured_ee_pose: EndEffectorPose | None,
+        now_s: float,
     ) -> None:
         if controller_state is None:
             return
@@ -380,6 +467,27 @@ class BimanualTeleopSession:
         controller_state.control_receive_epoch_ms = time.time() * 1000.0
         runtime.last_controller_state = controller_state
         if not controller_state.has_valid_pose:
+            return
+
+        # Button edges are control events, not pose samples.  Handle them
+        # before pose de-duplication and jitter buffering: the mapper emits an
+        # edge for one control-loop iteration only, and that iteration can
+        # legitimately contain a duplicate pose or merely fill the jitter
+        # buffer.  Delaying the edge until a pose is dequeued would therefore
+        # lose the clutch press/release and leave the arm permanently held.
+        if (
+            runtime.calibrated
+            and self.config.control_mode != ControlMode.CONTINUOUS
+            and (clutch_input.rising or clutch_input.falling)
+        ):
+            self._update_clutched_target(
+                runtime,
+                controller_state,
+                clutch_input,
+                measured_ee_pose,
+                now_s,
+                events,
+            )
             return
 
         marker = self._pose_marker(controller_state)
@@ -421,6 +529,23 @@ class BimanualTeleopSession:
                 )
             return
 
+        if self.config.control_mode == ControlMode.CONTINUOUS:
+            self._update_continuous_target(runtime, controller_state)
+        else:
+            self._update_clutched_target(
+                runtime,
+                controller_state,
+                clutch_input,
+                measured_ee_pose,
+                now_s,
+                events,
+            )
+
+    def _update_continuous_target(
+        self,
+        runtime: _HandRuntime,
+        controller_state: ControllerState,
+    ) -> None:
         reference_position = runtime.reference_position
         if reference_position is None:
             return
@@ -437,6 +562,15 @@ class BimanualTeleopSession:
             home_orientation=runtime.home_orientation,
         )
 
+        self._apply_target(runtime, controller_state, robot_pos, robot_rot)
+
+    def _apply_target(
+        self,
+        runtime: _HandRuntime,
+        controller_state: ControllerState,
+        robot_pos: np.ndarray,
+        robot_rot: np.ndarray,
+    ) -> None:
         dt_s = None
         if runtime.last_target_update_s is not None:
             dt_s = controller_state.receive_time_s - runtime.last_target_update_s
@@ -463,6 +597,106 @@ class BimanualTeleopSession:
             runtime.target_rot = robot_rot
 
         runtime.last_target_update_s = controller_state.receive_time_s
+
+    def _update_clutched_target(
+        self,
+        runtime: _HandRuntime,
+        controller_state: ControllerState,
+        clutch_input: HandClutchInput,
+        measured_ee_pose: EndEffectorPose | None,
+        now_s: float,
+        events: list[SessionEvent],
+    ) -> None:
+        if runtime.clutch_forced_hold and not clutch_input.pressed:
+            runtime.clutch_forced_hold = False
+
+        if clutch_input.rising:
+            if (
+                runtime.clutch_forced_hold
+                or not controller_state.has_valid_pose
+                or measured_ee_pose is None
+                or not measured_ee_pose.valid
+            ):
+                runtime.clutch_active = False
+                runtime.clutch_anchor = None
+                runtime.clutch_forced_hold = True
+                runtime.target_velocity_mps = np.zeros(3, dtype=float)
+                events.append(
+                    SessionEvent(
+                        level="warning",
+                        hand=runtime.hand,
+                        message=f"{runtime.hand.upper()} clutch takeover rejected; holding target",
+                    )
+                )
+                return
+
+            controller_rot = self.frame_transform.orientation_xyzw_to_robot_wxyz(
+                controller_state.pose.orientation_xyzw
+            )
+            runtime.clutch_anchor = ClutchAnchor(
+                controller_position_xyz=controller_state.pose.position_xyz.copy(),
+                controller_orientation_wxyz=controller_rot.copy(),
+                controller_orientation_xyzw=(
+                    controller_state.pose.orientation_xyzw.copy()
+                ),
+                ee_position_xyz=measured_ee_pose.position_xyz.copy(),
+                ee_orientation_wxyz=measured_ee_pose.orientation_wxyz.copy(),
+                engaged_at_s=float(now_s),
+            )
+            runtime.clutch_active = True
+            runtime.clutch_forced_hold = False
+            runtime.target_pos = measured_ee_pose.position_xyz.copy()
+            runtime.smoothed_pos = runtime.target_pos.copy()
+            runtime.target_rot = measured_ee_pose.orientation_wxyz.copy()
+            runtime.smoothed_rot = runtime.target_rot.copy()
+            runtime.target_velocity_mps = np.zeros(3, dtype=float)
+            runtime.last_target_update_s = controller_state.receive_time_s
+            runtime.safety.apply_position(runtime.target_pos)
+            runtime.reset_filters(runtime.target_pos, runtime.target_rot)
+            events.append(
+                SessionEvent(
+                    level="info",
+                    hand=runtime.hand,
+                    message=f"{runtime.hand.upper()} clutch engaged",
+                )
+            )
+            return
+
+        if clutch_input.falling:
+            runtime.clutch_active = False
+            runtime.clutch_anchor = None
+            runtime.target_velocity_mps = np.zeros(3, dtype=float)
+            runtime.reset_filters(runtime.target_pos, runtime.target_rot)
+            events.append(
+                SessionEvent(
+                    level="info",
+                    hand=runtime.hand,
+                    message=f"{runtime.hand.upper()} clutch released",
+                )
+            )
+            return
+
+        if not runtime.clutch_active:
+            return
+
+        anchor = runtime.clutch_anchor
+        if anchor is None:
+            runtime.clutch_active = False
+            runtime.clutch_forced_hold = True
+            runtime.target_velocity_mps = np.zeros(3, dtype=float)
+            return
+
+        delta = controller_state.pose.position_xyz - anchor.controller_position_xyz
+        robot_pos, robot_rot = _clutched_relative_pose(
+            frame_transform=self.frame_transform,
+            controller_delta_xr_xyz=delta,
+            current_controller_orientation_xyzw=(
+                controller_state.pose.orientation_xyzw
+            ),
+            anchor=anchor,
+            pos_scale=self.config.pos_scale,
+        )
+        self._apply_target(runtime, controller_state, robot_pos, robot_rot)
 
     def _update_deadman(
         self,
@@ -503,6 +737,12 @@ class BimanualTeleopSession:
 
         if age_s > self.config.hard_timeout_s and not runtime.hard_timeout_active:
             runtime.hard_timeout_active = True
+            if runtime.clutch_active:
+                runtime.clutch_active = False
+                runtime.clutch_anchor = None
+                runtime.clutch_forced_hold = True
+                runtime.target_velocity_mps = np.zeros(3, dtype=float)
+                runtime.reset_filters(runtime.target_pos, runtime.target_rot)
             events.append(
                 SessionEvent(
                     level="warning",
@@ -516,10 +756,7 @@ class BimanualTeleopSession:
         analog_value = 0.0
         closed = False
         if controller_state is not None:
-            analog_value = max(
-                float(controller_state.axes.trigger),
-                float(controller_state.axes.squeeze),
-            )
+            analog_value = float(controller_state.axes.trigger)
             closed = analog_value > self.config.gripper_threshold
 
         if runtime.hard_timeout_active:
@@ -619,6 +856,8 @@ class BimanualTeleopSession:
             if runtime.reference_position is None
             else runtime.reference_position.copy(),
             home_position=runtime.home_position.copy(),
+            clutch_active=runtime.clutch_active,
+            clutch_forced_hold=runtime.clutch_forced_hold,
         )
 
     @staticmethod
@@ -638,8 +877,30 @@ class BimanualTeleopSession:
     def reset(self, *, preserve_calibration: bool = False) -> None:
         if not preserve_calibration:
             self.calibration.reset()
+        self._active_intervention_id = -1
+        self._previous_any_human_active = False
         for runtime in (self.left, self.right):
             runtime.reset_runtime_state(preserve_calibration=preserve_calibration)
+
+    def _update_intervention_id(self) -> InterventionStatus:
+        any_active = self.left.clutch_active or self.right.clutch_active
+        if any_active and not self._previous_any_human_active:
+            self._active_intervention_id = self._next_intervention_id
+            self._next_intervention_id += 1
+        elif not any_active:
+            self._active_intervention_id = -1
+        self._previous_any_human_active = any_active
+        return InterventionStatus(
+            left=HandInterventionStatus(
+                active=self.left.clutch_active,
+                forced_hold=self.left.clutch_forced_hold,
+            ),
+            right=HandInterventionStatus(
+                active=self.right.clutch_active,
+                forced_hold=self.right.clutch_forced_hold,
+            ),
+            intervention_id=self._active_intervention_id,
+        )
 
 
 class SingleArmTeleopSession(BimanualTeleopSession):
@@ -685,7 +946,14 @@ class SingleArmTeleopSession(BimanualTeleopSession):
             now_s = time.monotonic()
 
         events: list[SessionEvent] = []
-        self._ingest_controller_state(self.arm, controller_state, events)
+        self._ingest_controller_state(
+            self.arm,
+            controller_state,
+            events,
+            clutch_input=HandClutchInput(),
+            measured_ee_pose=None,
+            now_s=now_s,
+        )
         self._update_deadman(self.arm, now_s, events)
 
         targets = SingleArmTeleopTargets(

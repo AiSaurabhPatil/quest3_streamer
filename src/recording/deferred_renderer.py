@@ -44,6 +44,44 @@ if SRC_DIR not in sys.path:
 from isaac_backend.app import IsaacApp
 
 
+def _compact_clutch_holds(frames: list[dict]) -> list[dict]:
+    """Remove elapsed-time-only samples from a recorded clutch trajectory.
+
+    In clutched teleoperation the command is deliberately held constant while
+    the grip button is released.  Those samples are useful in the source
+    dataset because they describe the real-time control session, but replaying
+    each one makes an offline video stop at every clutch release.  Keep the
+    final sample of every identical-command run: it captures the measured
+    joint state after the arm has settled, while joining adjacent motion runs
+    into one continuous replay trajectory.
+
+    The comparison intentionally uses the recorded ``action`` rather than the
+    observed state.  Physics settling can make states differ slightly during a
+    hold even though no new robot motion was commanded.
+    """
+    if len(frames) < 2:
+        return frames
+
+    compacted: list[dict] = []
+    for index in range(1, len(frames)):
+        previous = frames[index - 1].get("action")
+        current = frames[index].get("action")
+        same_command = (
+            previous is not None
+            and current is not None
+            and np.array_equal(
+                np.asarray(previous, dtype=np.float32),
+                np.asarray(current, dtype=np.float32),
+            )
+        )
+        if not same_command:
+            compacted.append(frames[index - 1])
+
+    # Keep the final state of the final command run.
+    compacted.append(frames[-1])
+    return compacted
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Deferred Offline Renderer for LeRobot Datasets")
     parser.add_argument("--repo-id", required=True, help="HuggingFace repo ID of the dataset to render")
@@ -58,6 +96,14 @@ def _build_parser() -> argparse.ArgumentParser:
         help=(
             "Number of physics steps to run (without rendering) before each rendered frame. "
             "0 = auto-detect from target_control_rate_hz / fps."
+        ),
+    )
+    parser.add_argument(
+        "--preserve-hold-frames",
+        action="store_true",
+        help=(
+            "Replay every recorded frame, including clutch hold intervals. "
+            "By default those intervals are compacted for a continuous video trajectory."
         ),
     )
     return parser
@@ -108,14 +154,16 @@ def main(argv=None):
         
     try:
         from src.isaac_backend import CameraManager
-        from src.robot_adapters import FFWBG2Adapter, OpenArmAdapter
+        from src.robot_adapters import AconeAdapter, FFWBG2Adapter, OpenArmAdapter
         from src.recording import RecordingConfig, build_recording_schema, LeRobotEpisodeRecorder, RecordingFrameSnapshot
         from src.config_loader import load_runtime_config, default_project_root
         
         project_root = default_project_root()
         runtime = load_runtime_config(config_path=None, robot=args.robot_type, project_root=project_root)
         
-        if args.robot_type == "ffw_bg2":
+        if args.robot_type == "acone":
+            adapter = AconeAdapter.from_mapping(runtime.robot, project_root=project_root)
+        elif args.robot_type == "ffw_bg2":
             adapter = FFWBG2Adapter.from_mapping(runtime.robot, project_root=project_root)
         else:
             adapter = OpenArmAdapter.from_mapping(runtime.robot, project_root=project_root)
@@ -263,7 +311,18 @@ def main(argv=None):
         print(f"[Renderer] Rendering {len(dataset_info['episodes'])} episodes...")
         for episode in dataset_info["episodes"]:
             ep_idx = episode["episode_index"]
-            print(f"[Renderer] Starting episode {ep_idx} ({episode['length']} frames)")
+            source_frames = episode["frames"]
+            frames = (
+                source_frames
+                if args.preserve_hold_frames
+                else _compact_clutch_holds(source_frames)
+            )
+            if len(frames) != len(source_frames):
+                print(
+                    f"[Renderer] Episode {ep_idx}: compacted clutch holds "
+                    f"from {len(source_frames)} to {len(frames)} trajectory waypoints"
+                )
+            print(f"[Renderer] Starting episode {ep_idx} ({len(frames)} replay frames)")
 
             # ---------------------------------------------------------------- #
             # Bug 2 fix: reset the world at the start of every episode so      #
@@ -294,12 +353,17 @@ def main(argv=None):
             for _ in range(10):
                 isaac_app.step(render=False)
 
-            for frame_idx, frame_data in enumerate(episode["frames"]):
+            for frame_idx, frame_data in enumerate(frames):
                 state = frame_data.get("observation.state", None)
                 action = frame_data.get("action", None)
-                
-                if action is not None:
-                    recorded_action = np.array(action, dtype=np.float32).reshape(-1)
+
+                # Reconstruct the trajectory from measured joint states, not
+                # the clutch-gated commands.  State is the pose actually
+                # reached by the robot at each retained waypoint; action is
+                # still copied to the rendered dataset as its training label.
+                replay_joint_state = state if state is not None else action
+                if replay_joint_state is not None:
+                    recorded_joint_state = np.array(replay_joint_state, dtype=np.float32).reshape(-1)
                     
                     # Start with current joints to preserve unrecorded joints
                     current_positions = adapter.get_current_joint_positions()
@@ -312,9 +376,9 @@ def main(argv=None):
                     
                     target_pos = current_positions.copy()
                     
-                    action_names = schema.action_spec.names
-                    for i, name in enumerate(action_names):
-                        val = float(recorded_action[i])
+                    state_names = schema.state_spec.names
+                    for i, name in enumerate(state_names):
+                        val = float(recorded_joint_state[i])
                         if name in ("left_gripper", "right_gripper"):
                             # Denormalize gripper scalar
                             val = gripper_open + val * (gripper_closed - gripper_open)

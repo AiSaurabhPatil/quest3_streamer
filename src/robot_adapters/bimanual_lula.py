@@ -8,6 +8,10 @@ import numpy as np
 import yaml
 
 from .base import AdapterDiagnostics, CameraSpec, RobotAction, RobotAdapter
+try:
+    from src.teleop_core.intervention import EndEffectorPose
+except ImportError:
+    from teleop_core.intervention import EndEffectorPose
 
 
 @dataclass
@@ -512,6 +516,47 @@ class BimanualLulaAdapter(RobotAdapter):
         if pos is not None and len(pos.shape) == 2:
             return pos[0]
         return pos
+
+    def get_current_end_effector_poses(
+        self,
+        joint_positions=None,
+    ) -> dict[str, EndEffectorPose]:
+        positions = self.get_current_joint_positions() if joint_positions is None else joint_positions
+        if positions is None:
+            return {}
+        positions = np.asarray(positions, dtype=float).reshape(-1)
+        poses: dict[str, EndEffectorPose] = {}
+        for hand, solver, runtime, indices in (
+            ("left", self.left_ik_solver, self.left_runtime, self.left_arm_indices),
+            ("right", self.right_ik_solver, self.right_runtime, self.right_arm_indices),
+        ):
+            if solver is None or not indices:
+                continue
+            try:
+                pose = self._home_pose_from_fk(
+                    solver,
+                    runtime.frame_name,
+                    positions[indices],
+                )
+            except Exception:
+                pose = None
+            if pose is not None:
+                poses[hand] = EndEffectorPose(
+                    position_xyz=pose[0],
+                    orientation_wxyz=pose[1],
+                    valid=True,
+                )
+        return poses
+
+    def sync_ik_warm_start(self, joint_positions=None) -> None:
+        positions = self.get_current_joint_positions() if joint_positions is None else joint_positions
+        if positions is None:
+            return
+        positions = np.asarray(positions, dtype=float).reshape(-1)
+        if self.left_arm_indices:
+            self.left_runtime.last_arm_positions = positions[self.left_arm_indices].copy()
+        if self.right_arm_indices:
+            self.right_runtime.last_arm_positions = positions[self.right_arm_indices].copy()
 
     def reinitialize_physics_handles(self) -> bool:
         """Rebuild the articulation's PhysX tensor view after the scene changes.

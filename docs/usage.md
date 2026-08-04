@@ -54,7 +54,8 @@ Accept the self-signed certificate warning (click **Advanced → Proceed**), the
 | **Left Primary** (B / A) | **Save** the current episode |
 | **Right Secondary** | **Reset scene** (discards unsaved episode when deferred rendering is on) |
 | **Right Primary** | **Cycle camera views** (perspective → head → left wrist → right wrist) |
-| **Left / Right Trigger or Grip** | Close the respective gripper |
+| **Left / Right Trigger** | Close the respective gripper |
+| **Left / Right Grip Hold** | Engage clutched arm control when clutch mode is enabled |
 | **Left / Right Controller Movement** | Move the respective arm's end-effector |
 
 ---

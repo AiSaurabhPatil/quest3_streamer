@@ -77,6 +77,14 @@ cameras:
   log_errors: true
   error_log_interval_s: 5.0
 
+teleop:
+  control_mode: continuous
+  intervention:
+    button: grip
+    arbitration: per_hand
+    policy_reentry_blend_ms: 200
+    analog_threshold: 0.1
+
 recording:
   enabled: false
   dataset_format: "v3.0"
@@ -90,6 +98,9 @@ recording:
   image_writer_threads: 4
   auto_start_episode: false
   deferred_rendering: true
+  intervention:
+    enabled: false
+    include_candidate_actions: true
   cameras:
     resolution: [640, 480]
   buttons:
@@ -97,5 +108,3 @@ recording:
     reset_scene: "right_secondary"
     save_episode: "left_primary"
     start_episode: "left_secondary"
-
-

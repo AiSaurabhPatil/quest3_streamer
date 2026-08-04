@@ -9,6 +9,8 @@ import shutil
 import sys
 import traceback
 
+import numpy as np
+
 from .snapshots import RecorderDiagnostics, RecordingFrameSnapshot
 from .ipc import IPCClosedError, receive_message, send_message
 
@@ -196,6 +198,13 @@ class LeRobotWorkerProcess:
         }
         for camera_spec in self._schema.camera_specs:
             payload[camera_spec.feature_key] = snapshot.cameras[camera_spec.camera_name]
+        for spec in self._schema.auxiliary_specs:
+            if spec.key not in snapshot.extra_features:
+                raise KeyError(f"Missing recording extra feature '{spec.key}'")
+            payload[spec.key] = np.asarray(
+                snapshot.extra_features[spec.key],
+                dtype=spec.dtype,
+            ).reshape(spec.shape)
         return payload
 
     def _record_error(self, exc: Exception) -> None:

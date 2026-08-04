@@ -4,7 +4,7 @@ import argparse
 from copy import deepcopy
 import os
 
-from src.teleop_core import TeleopSessionConfig
+from src.teleop_core import ClutchConfig, ControlMode, TeleopSessionConfig
 
 
 def merge_mapping(base: dict, override: dict | None) -> dict:
@@ -120,6 +120,26 @@ def build_teleop_arg_parser(robot_name: str, description: str) -> argparse.Argum
         action="store_true",
         help="Print recording progress while recording",
     )
+    parser.add_argument(
+        "--control-mode",
+        choices=("continuous", "clutched", "policy_intervention"),
+        help="Teleoperation control mode",
+    )
+    parser.add_argument(
+        "--clutch-button",
+        choices=("primary", "secondary", "menu", "stick_click", "grip", "squeeze"),
+        help="Button used for clutched human control",
+    )
+    parser.add_argument(
+        "--clutch-arbitration",
+        choices=("global", "per_hand"),
+        help="Whether clutch authority is global or per hand",
+    )
+    parser.add_argument(
+        "--policy-reentry-blend-ms",
+        type=float,
+        help="Blend duration when released arms return to policy control",
+    )
     return parser
 
 
@@ -198,6 +218,22 @@ def _optional_tau(value) -> float | None:
     return float(value)
 
 
+def apply_teleop_cli_overrides(settings: dict, args: argparse.Namespace) -> dict:
+    merged = deepcopy(settings)
+    if args.control_mode is not None:
+        merged["control_mode"] = args.control_mode
+    intervention = dict(merged.get("intervention", {}))
+    if args.clutch_button is not None:
+        intervention["button"] = args.clutch_button
+    if args.clutch_arbitration is not None:
+        intervention["arbitration"] = args.clutch_arbitration
+    if args.policy_reentry_blend_ms is not None:
+        intervention["policy_reentry_blend_ms"] = args.policy_reentry_blend_ms
+    if intervention:
+        merged["intervention"] = intervention
+    return merged
+
+
 def build_common_teleop_config(
     adapter,
     settings: dict,
@@ -209,8 +245,20 @@ def build_common_teleop_config(
     
     position_tau_s = _optional_tau(smoothing.get("position_tau_s"))
     orientation_tau_s = _optional_tau(smoothing.get("orientation_tau_s"))
+    control_mode = ControlMode(settings.get("control_mode", ControlMode.CONTINUOUS.value))
+    intervention = dict(settings.get("intervention", {}))
+    clutch = ClutchConfig.from_mapping(
+        {
+            "button": intervention.get("button", "grip"),
+            "arbitration": intervention.get("arbitration", "per_hand"),
+            "policy_reentry_blend_ms": intervention.get("policy_reentry_blend_ms", 200),
+            "analog_threshold": intervention.get("analog_threshold", 0.1),
+        }
+    )
     
     return TeleopSessionConfig(
+        control_mode=control_mode,
+        clutch=clutch,
         pos_scale=settings.get("position_scale", [1.0, 1.0, 1.0]),
         robot_workspace_center=settings.get("workspace_center", default_workspace_center or [0.3, 0.0, 0.3]),
         left_arm_offset=adapter.left_workspace_offset.tolist(),

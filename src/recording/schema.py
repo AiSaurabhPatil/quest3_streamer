@@ -28,6 +28,7 @@ class RecordingSchema:
     state_spec: VectorSpec
     action_spec: VectorSpec
     camera_specs: tuple[CameraFeatureSpec, ...]
+    auxiliary_specs: tuple[VectorSpec, ...] = ()
 
 
 def build_recording_schema(adapter, robot_config: dict, recording_config: RecordingConfig) -> RecordingSchema:
@@ -47,6 +48,35 @@ def build_recording_schema(adapter, robot_config: dict, recording_config: Record
             "names": list(action_names),
         },
     }
+    auxiliary_specs: list[VectorSpec] = []
+    if recording_config.intervention.enabled:
+        for key in (
+            "action.human_valid",
+            "action.policy_valid",
+            "control.source",
+            "intervention.active",
+            "intervention.left",
+            "intervention.right",
+            "intervention.id",
+            "intervention.reentry_blend_active",
+        ):
+            spec = VectorSpec(key=key, names=(key,), shape=(1,), dtype="int64")
+            auxiliary_specs.append(spec)
+            features[key] = {"dtype": spec.dtype, "shape": spec.shape, "names": list(spec.names)}
+        if recording_config.intervention.include_candidate_actions:
+            for key in ("action.human", "action.policy"):
+                spec = VectorSpec(
+                    key=key,
+                    names=action_names,
+                    shape=(len(action_names),),
+                    dtype=recording_config.action.dtype,
+                )
+                auxiliary_specs.append(spec)
+                features[key] = {
+                    "dtype": spec.dtype,
+                    "shape": spec.shape,
+                    "names": list(spec.names),
+                }
     for camera_spec in camera_specs:
         features[camera_spec.feature_key] = {
             "dtype": camera_spec.dtype,
@@ -69,6 +99,7 @@ def build_recording_schema(adapter, robot_config: dict, recording_config: Record
             dtype=recording_config.action.dtype,
         ),
         camera_specs=camera_specs,
+        auxiliary_specs=tuple(auxiliary_specs),
     )
 
 

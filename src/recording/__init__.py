@@ -3,6 +3,7 @@ from .config import (
     RecordingButtonConfig,
     RecordingCameraConfig,
     RecordingConfig,
+    RecordingInterventionConfig,
     RecordingResetPolicy,
     RecordingVectorConfig,
 )
@@ -19,6 +20,7 @@ __all__ = [
     "RecordingCameraConfig",
     "RecordingConfig",
     "RecordingFrameSnapshot",
+    "RecordingInterventionConfig",
     "RecordingResetPolicy",
     "RecordingSchema",
     "RecordingVectorConfig",

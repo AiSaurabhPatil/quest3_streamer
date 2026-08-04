@@ -10,6 +10,7 @@ class RecordingFrameSnapshot:
     state: np.ndarray
     action: np.ndarray
     cameras: dict[str, np.ndarray] = field(default_factory=dict)
+    extra_features: dict[str, np.ndarray] = field(default_factory=dict)
     task: str = ""
     monotonic_time_s: float = 0.0
     sequence: int | None = None

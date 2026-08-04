@@ -5,6 +5,7 @@ import argparse
 from src.config_loader import default_project_root, load_runtime_config
 from src.launch.bimanual_runtime import run_bimanual_runtime
 from src.launch.teleop_utils import (
+    apply_teleop_cli_overrides,
     build_common_teleop_config,
     build_teleop_arg_parser,
     merge_mapping,
@@ -48,6 +49,7 @@ def main(argv: list[str] | None = None) -> int:
         dict(runtime.main.get("teleop", {})),
         dict(runtime.robot.get("teleop", {}))
     )
+    merged_teleop_settings = apply_teleop_cli_overrides(merged_teleop_settings, args)
     
     runtime_config = build_common_teleop_config(
         adapter=adapter,

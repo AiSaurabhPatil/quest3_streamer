@@ -6,6 +6,11 @@ from typing import Any
 
 import numpy as np
 
+try:
+    from src.teleop_core.intervention import EndEffectorPose
+except ImportError:
+    from teleop_core.intervention import EndEffectorPose
+
 
 @dataclass
 class CameraSpec:
@@ -74,6 +79,18 @@ class RobotAdapter(ABC):
 
     def get_debug_end_effector_positions(self, joint_positions=None) -> dict[str, np.ndarray]:
         return {}
+
+    def get_current_end_effector_poses(
+        self,
+        joint_positions=None,
+    ) -> dict[str, EndEffectorPose]:
+        return {}
+
+    def validate_action(self, action: RobotAction | None) -> bool:
+        if action is None:
+            return False
+        values = np.asarray(action.joint_positions, dtype=float).reshape(-1)
+        return values.size == len(self.get_joint_names()) and bool(np.all(np.isfinite(values)))
 
     def get_recording_robot_type(self) -> str:
         return self.__class__.__name__.replace("Adapter", "").lower()

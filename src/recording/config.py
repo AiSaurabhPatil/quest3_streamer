@@ -113,6 +113,20 @@ class RecordingCameraConfig:
 
 
 @dataclass(frozen=True)
+class RecordingInterventionConfig:
+    enabled: bool = False
+    include_candidate_actions: bool = True
+
+    @classmethod
+    def from_mapping(cls, values: dict[str, Any] | None):
+        values = values or {}
+        return cls(
+            enabled=bool(values.get("enabled", False)),
+            include_candidate_actions=bool(values.get("include_candidate_actions", True)),
+        )
+
+
+@dataclass(frozen=True)
 class RecordingConfig:
     enabled: bool = False
     dataset_format: str = "v3.0"
@@ -146,6 +160,7 @@ class RecordingConfig:
     )
     deferred_rendering: bool = False
     cameras: RecordingCameraConfig = field(default_factory=RecordingCameraConfig)
+    intervention: RecordingInterventionConfig = field(default_factory=RecordingInterventionConfig)
 
     @classmethod
     def from_mapping(cls, values: dict[str, Any] | None, *, project_root: str):
@@ -190,6 +205,7 @@ class RecordingConfig:
                 default_key="action",
             ),
             cameras=RecordingCameraConfig.from_mapping(values.get("cameras")),
+            intervention=RecordingInterventionConfig.from_mapping(values.get("intervention")),
         )
         config.validate()
         return config

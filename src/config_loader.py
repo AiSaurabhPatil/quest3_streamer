@@ -49,9 +49,16 @@ DEFAULT_MAIN_CONFIG = {
         ],
     },
     "teleop": {
+        "control_mode": "continuous",
         "calibration_samples": 30,
         "position_scale": [1.0, 1.0, 1.0],
         "workspace_center": [0.3, 0.0, 0.3],
+        "intervention": {
+            "button": "grip",
+            "arbitration": "per_hand",
+            "policy_reentry_blend_ms": 200,
+            "analog_threshold": 0.1,
+        },
         "smoothing": {
             "position_alpha": 0.9,
             "orientation_alpha": 0.9,
@@ -102,6 +109,10 @@ DEFAULT_MAIN_CONFIG = {
         "finalize_on_shutdown": True,
         "push_to_hub_on_shutdown": False,
         "private_hub_repo": False,
+        "intervention": {
+            "enabled": False,
+            "include_candidate_actions": True,
+        },
         "buttons": {
             "switch_camera": "right_primary",
             "reset_scene": "right_secondary",
@@ -334,6 +345,12 @@ def _normalize_main_config(values: dict[str, Any], project_root: str) -> dict[st
     smoothing_defaults = deepcopy(DEFAULT_MAIN_CONFIG["teleop"]["smoothing"])
     smoothing_defaults.update(smoothing_values)
     teleop_values["smoothing"] = smoothing_defaults
+    intervention_values = teleop_values.get("intervention", {})
+    if not isinstance(intervention_values, dict):
+        intervention_values = {}
+    intervention_defaults = deepcopy(DEFAULT_MAIN_CONFIG["teleop"]["intervention"])
+    intervention_defaults.update(intervention_values)
+    teleop_values["intervention"] = intervention_defaults
     merged["teleop"] = teleop_values
 
     transport_values = dict(merged.get("transport", {}))
